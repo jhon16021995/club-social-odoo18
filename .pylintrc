@@ -1,11 +1,13 @@
 [MASTER]
 load-plugins=pylint_odoo
+score=no
 
 [ODOOLINT]
 valid-odoo-versions=18.0
 
 [MESSAGES CONTROL]
 disable=
+    import-error,
     missing-module-docstring,
     missing-class-docstring,
     missing-function-docstring,
