@@ -141,3 +141,187 @@ class ResPartner(models.Model):
                 raise ValidationError(
                     self.env._("Ya existe una persona con el mismo carnet y extensión.")
                 )
+
+    def _build_club_member_code(
+        self,
+        id_number,
+        id_extension,
+        exclude_partner=None,
+    ):
+        if not id_number:
+            return False
+
+        domain = [
+            ("club_person_type", "=", "member"),
+            ("club_id_number", "=", id_number),
+        ]
+
+        if exclude_partner:
+            domain.append(("id", "!=", exclude_partner.id))
+
+        same_number_exists = bool(self.search(domain, limit=1))
+
+        if same_number_exists:
+            suffix = id_extension or "SINEXT"
+            return f"{id_number}-{suffix}"
+
+        return id_number
+
+    def _check_club_member_code_available(
+        self,
+        member_code,
+        exclude_partner=None,
+    ):
+        if not member_code:
+            return
+
+        domain = [("club_member_code", "=", member_code)]
+
+        if exclude_partner:
+            domain.append(("id", "!=", exclude_partner.id))
+
+        if self.search(domain, limit=1):
+            raise ValidationError(
+                self.env._(
+                    "No se puede usar el código de asociado %(code)s porque "
+                    "ya pertenece a otro socio.",
+                    code=member_code,
+                )
+            )
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        prepared_vals_list = []
+        batch_member_numbers = set()
+        batch_member_codes = set()
+
+        for original_vals in vals_list:
+            vals = dict(original_vals)
+
+            if vals.get("club_person_type") != "member":
+                vals["club_member_code"] = False
+                prepared_vals_list.append(vals)
+                continue
+
+            id_number = vals.get("club_id_number")
+            id_extension = vals.get("club_id_extension")
+
+            if not id_number:
+                prepared_vals_list.append(vals)
+                continue
+
+            existing_member = self.search(
+                [
+                    ("club_person_type", "=", "member"),
+                    ("club_id_number", "=", id_number),
+                ],
+                limit=1,
+            )
+
+            same_number_exists = (
+                bool(existing_member) or id_number in batch_member_numbers
+            )
+
+            if same_number_exists:
+                suffix = id_extension or "SINEXT"
+                member_code = f"{id_number}-{suffix}"
+            else:
+                member_code = id_number
+
+            code_exists = self.search(
+                [("club_member_code", "=", member_code)],
+                limit=1,
+            )
+
+            if code_exists or member_code in batch_member_codes:
+                raise ValidationError(
+                    self.env._(
+                        "No se puede generar el código de asociado porque "
+                        "ya existe otro socio con el código %(code)s.",
+                        code=member_code,
+                    )
+                )
+
+            vals["club_member_code"] = member_code
+
+            batch_member_numbers.add(id_number)
+            batch_member_codes.add(member_code)
+            prepared_vals_list.append(vals)
+
+        return super().create(prepared_vals_list)
+
+    def write(self, vals):
+        vals = dict(vals)
+        vals.pop("club_member_code", None)
+
+        if not vals:
+            return True
+
+        code_fields = {
+            "club_person_type",
+            "club_id_number",
+            "club_id_extension",
+        }
+
+        if not code_fields.intersection(vals):
+            return super().write(vals)
+
+        for partner in self:
+            partner_vals = dict(vals)
+
+            new_person_type = partner_vals.get(
+                "club_person_type",
+                partner.club_person_type,
+            )
+
+            if new_person_type != "member":
+                partner_vals["club_member_code"] = False
+                super(ResPartner, partner).write(partner_vals)
+                continue
+
+            new_id_number = partner_vals.get(
+                "club_id_number",
+                partner.club_id_number,
+            )
+            new_id_extension = partner_vals.get(
+                "club_id_extension",
+                partner.club_id_extension,
+            )
+
+            number_changed = (
+                "club_id_number" in partner_vals
+                and new_id_number != partner.club_id_number
+            )
+
+            becoming_member = partner.club_person_type != "member"
+
+            extension_changed = (
+                "club_id_extension" in partner_vals
+                and new_id_extension != partner.club_id_extension
+            )
+
+            if becoming_member or number_changed:
+                member_code = self._build_club_member_code(
+                    new_id_number,
+                    new_id_extension,
+                    exclude_partner=partner,
+                )
+            elif extension_changed:
+                if partner.club_member_code == partner.club_id_number:
+                    member_code = new_id_number
+                else:
+                    suffix = new_id_extension or "SINEXT"
+                    member_code = f"{new_id_number}-{suffix}"
+            else:
+                member_code = partner.club_member_code
+
+            self._check_club_member_code_available(
+                member_code,
+                exclude_partner=partner,
+            )
+
+            partner_vals["club_member_code"] = member_code
+
+            super(ResPartner, partner).write(partner_vals)
+
+        return True
