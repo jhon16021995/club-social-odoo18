@@ -1,0 +1,439 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ============================================================
+         FORMULARIO PROPIO DEL CLUB
+         Usa res.partner, pero sin recargar la ficha con campos
+         generales de Contactos que no necesitamos aquí.
+         ============================================================ -->
+
+    <record id="view_partner_form_club_membership" model="ir.ui.view">
+        <field name="name">res.partner.form.club.membership</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" eval="False"/>
+        <field name="arch" type="xml">
+            <form string="Ficha del Club">
+                <sheet>
+                    <field name="is_company" invisible="1"/>
+
+                    <field
+                        name="image_1920"
+                        widget="image"
+                        class="oe_avatar"
+                    />
+
+                    <div class="oe_title">
+                        <label for="name" string="Nombre / Razón social"/>
+                        <h1>
+                            <field
+                                name="name"
+                                placeholder="Nombre o razón social"
+                            />
+                        </h1>
+                    </div>
+
+                    <group>
+                        <group string="Clasificación">
+                            <field
+                                name="company_type"
+                                widget="radio"
+                                options="{'horizontal': true}"
+                            />
+
+                            <field
+                                name="club_person_type"
+                                required="1"
+                                readonly="club_person_type == 'member'"
+                            />
+
+                            <field
+                                name="club_id_number"
+                                string="Carnet / Identificación"
+                                required="1"
+                            />
+
+                            <field name="club_id_extension"/>
+                        </group>
+
+                        <group string="Contacto">
+                            <field name="phone"/>
+                            <field name="mobile"/>
+                            <field name="email"/>
+                        </group>
+                    </group>
+
+                    <group>
+                        <group string="Datos personales / empresariales">
+                            <field
+                                name="club_birthdate"
+                                invisible="is_company"
+                                required="not is_company"
+                            />
+
+                            <field
+                                name="club_age"
+                                readonly="1"
+                                invisible="is_company"
+                            />
+
+                            <field
+                                name="club_nationality_id"
+                                invisible="is_company"
+                            />
+
+                            <field
+                                name="club_marital_status"
+                                invisible="is_company"
+                            />
+
+                            <field name="club_occupation"/>
+
+                            <field
+                                name="club_title"
+                                invisible="is_company"
+                            />
+                        </group>
+
+                        <group string="Dirección">
+                            <field
+                                name="street"
+                                placeholder="Calle / Avenida"
+                            />
+
+                            <field
+                                name="street2"
+                                placeholder="Zona / Referencia"
+                            />
+
+                            <field name="city"/>
+                            <field name="state_id"/>
+                            <field name="zip"/>
+                            <field name="country_id"/>
+                        </group>
+                    </group>
+
+                    <group
+                        string="Datos institucionales"
+                        invisible="club_person_type != 'member'"
+                    >
+                        <group>
+                            <field
+                                name="club_member_code"
+                                readonly="1"
+                            />
+
+                            <field name="club_join_date"/>
+
+                            <field
+                                name="club_seniority"
+                                readonly="1"
+                            />
+                        </group>
+
+                        <group>
+                            <field name="club_member_state"/>
+                            <field name="club_legal_state"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         LISTA DE SOCIOS
+         ============================================================ -->
+
+    <record id="view_club_member_list" model="ir.ui.view">
+        <field name="name">res.partner.club.member.list</field>
+        <field name="model">res.partner</field>
+        <field name="arch" type="xml">
+            <list string="Socios">
+                <field name="name"/>
+
+                <field
+                    name="company_type"
+                    string="Persona / Empresa"
+                />
+
+                <field
+                    name="club_id_number"
+                    string="Carnet / Identificación"
+                />
+
+                <field name="club_id_extension"/>
+                <field name="club_member_code"/>
+                <field name="club_member_state"/>
+                <field name="club_legal_state"/>
+
+                <field
+                    name="club_age"
+                    optional="hide"
+                />
+
+                <field name="mobile"/>
+
+                <field
+                    name="email"
+                    optional="hide"
+                />
+            </list>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         LISTA DE CLIENTES
+         ============================================================ -->
+
+    <record id="view_club_client_list" model="ir.ui.view">
+        <field name="name">res.partner.club.client.list</field>
+        <field name="model">res.partner</field>
+        <field name="arch" type="xml">
+            <list string="Clientes">
+                <field name="name"/>
+
+                <field
+                    name="company_type"
+                    string="Persona / Empresa"
+                />
+
+                <field
+                    name="club_id_number"
+                    string="Carnet / Identificación"
+                />
+
+                <field name="club_id_extension"/>
+                <field name="club_occupation"/>
+                <field name="mobile"/>
+
+                <field
+                    name="email"
+                    optional="hide"
+                />
+            </list>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         BÚSQUEDA DE SOCIOS
+         ============================================================ -->
+
+    <record id="view_club_member_search" model="ir.ui.view">
+        <field name="name">res.partner.club.member.search</field>
+        <field name="model">res.partner</field>
+        <field name="arch" type="xml">
+            <search string="Buscar socios">
+                <field name="name"/>
+                <field name="club_id_number"/>
+                <field name="club_member_code"/>
+                <field name="phone"/>
+                <field name="mobile"/>
+                <field name="email"/>
+
+                <separator/>
+
+                <filter
+                    string="Activo"
+                    name="member_active"
+                    domain="[('club_member_state', '=', 'active')]"
+                />
+
+                <filter
+                    string="Activo en mora"
+                    name="member_active_arrears"
+                    domain="[('club_member_state', '=', 'active_arrears')]"
+                />
+
+                <filter
+                    string="Vitalicio"
+                    name="member_lifetime"
+                    domain="[('club_member_state', '=', 'lifetime')]"
+                />
+
+                <filter
+                    string="Ausente"
+                    name="member_absent"
+                    domain="[('club_member_state', '=', 'absent')]"
+                />
+
+                <filter
+                    string="Transitorio"
+                    name="member_temporary"
+                    domain="[('club_member_state', '=', 'temporary')]"
+                />
+
+                <filter
+                    string="Pasivo"
+                    name="member_inactive"
+                    domain="[('club_member_state', '=', 'inactive')]"
+                />
+
+                <group expand="0" string="Agrupar por">
+                    <filter
+                        string="Estado del asociado"
+                        name="group_member_state"
+                        context="{'group_by': 'club_member_state'}"
+                    />
+
+                    <filter
+                        string="Estado legal"
+                        name="group_legal_state"
+                        context="{'group_by': 'club_legal_state'}"
+                    />
+
+                    <filter
+                        string="Persona / Empresa"
+                        name="group_company_type"
+                        context="{'group_by': 'company_type'}"
+                    />
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         BÚSQUEDA DE CLIENTES
+         ============================================================ -->
+
+    <record id="view_club_client_search" model="ir.ui.view">
+        <field name="name">res.partner.club.client.search</field>
+        <field name="model">res.partner</field>
+        <field name="arch" type="xml">
+            <search string="Buscar clientes">
+                <field name="name"/>
+                <field name="club_id_number"/>
+                <field name="club_occupation"/>
+                <field name="phone"/>
+                <field name="mobile"/>
+                <field name="email"/>
+
+                <group expand="0" string="Agrupar por">
+                    <filter
+                        string="Persona / Empresa"
+                        name="group_client_company_type"
+                        context="{'group_by': 'company_type'}"
+                    />
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         ACCIÓN DE SOCIOS
+         ============================================================ -->
+
+    <record id="action_club_members" model="ir.actions.act_window">
+        <field name="name">Socios</field>
+        <field name="res_model">res.partner</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" eval="False"/>
+        <field name="search_view_id" ref="view_club_member_search"/>
+
+        <field name="domain">
+            [('club_person_type', '=', 'member')]
+        </field>
+
+        <field name="context">
+            {
+                'default_club_person_type': 'member'
+            }
+        </field>
+    </record>
+
+    <record
+        id="action_club_members_view_list"
+        model="ir.actions.act_window.view"
+    >
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_club_member_list"/>
+        <field name="act_window_id" ref="action_club_members"/>
+    </record>
+
+    <record
+        id="action_club_members_view_form"
+        model="ir.actions.act_window.view"
+    >
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">form</field>
+
+        <field
+            name="view_id"
+            ref="view_partner_form_club_membership"
+        />
+
+        <field name="act_window_id" ref="action_club_members"/>
+    </record>
+
+    <!-- ============================================================
+         ACCIÓN DE CLIENTES
+         ============================================================ -->
+
+    <record id="action_club_clients" model="ir.actions.act_window">
+        <field name="name">Clientes</field>
+        <field name="res_model">res.partner</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" eval="False"/>
+        <field name="search_view_id" ref="view_club_client_search"/>
+
+        <field name="domain">
+            [('club_person_type', '=', 'client')]
+        </field>
+
+        <field name="context">
+            {
+                'default_club_person_type': 'client'
+            }
+        </field>
+    </record>
+
+    <record
+        id="action_club_clients_view_list"
+        model="ir.actions.act_window.view"
+    >
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_club_client_list"/>
+        <field name="act_window_id" ref="action_club_clients"/>
+    </record>
+
+    <record
+        id="action_club_clients_view_form"
+        model="ir.actions.act_window.view"
+    >
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">form</field>
+
+        <field
+            name="view_id"
+            ref="view_partner_form_club_membership"
+        />
+
+        <field name="act_window_id" ref="action_club_clients"/>
+    </record>
+
+    <!-- ============================================================
+         MENÚ
+         ============================================================ -->
+
+    <menuitem
+        id="menu_club_social_root"
+        name="Club Social"
+        sequence="30"
+    />
+
+    <menuitem
+        id="menu_club_members"
+        name="Socios"
+        parent="menu_club_social_root"
+        action="action_club_members"
+        sequence="10"
+    />
+
+    <menuitem
+        id="menu_club_clients"
+        name="Clientes"
+        parent="menu_club_social_root"
+        action="action_club_clients"
+        sequence="20"
+    />
+</odoo>

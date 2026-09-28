@@ -35,12 +35,23 @@ class ResPartner(models.Model):
         string="Nacionalidad",
     )
 
+    club_marital_status = fields.Selection(
+        selection=[
+            ("single", "Soltero/a"),
+            ("married", "Casado/a"),
+            ("divorced", "Divorciado/a"),
+            ("widowed", "Viudo/a"),
+            ("common_law", "Unión libre"),
+        ],
+        string="Estado civil",
+    )
+
     club_occupation = fields.Char(
-        string="Ocupación",
+        string="Ocupación / Actividad",
     )
 
     club_title = fields.Char(
-        string="Título",
+        string="Título profesional",
     )
 
     club_member_code = fields.Char(
@@ -81,12 +92,15 @@ class ResPartner(models.Model):
         copy=False,
     )
 
-    @api.depends("club_birthdate")
+    @api.depends(
+        "club_birthdate",
+        "is_company",
+    )
     def _compute_club_age(self):
         today = fields.Date.context_today(self)
 
         for partner in self:
-            if not partner.club_birthdate:
+            if partner.is_company or not partner.club_birthdate:
                 partner.club_age = 0
                 continue
 
@@ -118,6 +132,7 @@ class ResPartner(models.Model):
         "club_id_number",
         "club_id_extension",
         "club_birthdate",
+        "is_company",
     )
     def _check_club_personal_data(self):
         today = fields.Date.context_today(self)
@@ -133,20 +148,22 @@ class ResPartner(models.Model):
                     )
                 )
 
-            if not partner.club_birthdate:
-                raise ValidationError(
-                    self.env._(
-                        "La fecha de nacimiento es obligatoria para socios y clientes."
+            if not partner.is_company:
+                if not partner.club_birthdate:
+                    raise ValidationError(
+                        self.env._(
+                            "La fecha de nacimiento es obligatoria para socios "
+                            "y clientes que sean personas individuales."
+                        )
                     )
-                )
 
-            if partner.club_birthdate > today:
-                raise ValidationError(
-                    self.env._(
-                        "La fecha de nacimiento no puede ser posterior "
-                        "a la fecha actual."
+                if partner.club_birthdate > today:
+                    raise ValidationError(
+                        self.env._(
+                            "La fecha de nacimiento no puede ser posterior "
+                            "a la fecha actual."
+                        )
                     )
-                )
 
             duplicate = self.search(
                 [
@@ -267,6 +284,15 @@ class ResPartner(models.Model):
             "club_person_type",
             partner.club_person_type,
         )
+
+        if partner.club_person_type == "member" and new_person_type != "member":
+            raise ValidationError(
+                self.env._(
+                    "Un socio no puede convertirse en cliente ni dejar de ser "
+                    "socio. Si deja de pertenecer al Club, debe cambiar su "
+                    "estado del asociado a Pasivo."
+                )
+            )
 
         if new_person_type != "member":
             partner_vals["club_member_code"] = False
