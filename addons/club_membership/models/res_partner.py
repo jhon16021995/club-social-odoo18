@@ -1,4 +1,5 @@
 from odoo import api, fields, models
+from odoo.exceptions import ValidationError
 
 
 class ResPartner(models.Model):
@@ -90,3 +91,53 @@ class ResPartner(models.Model):
                 - birthdate.year
                 - ((today.month, today.day) < (birthdate.month, birthdate.day))
             )
+
+    @api.constrains(
+        "club_person_type",
+        "club_id_number",
+        "club_id_extension",
+        "club_birthdate",
+    )
+    def _check_club_personal_data(self):
+        today = fields.Date.context_today(self)
+
+        for partner in self:
+            if partner.club_person_type not in ("member", "client"):
+                continue
+
+            if not partner.club_id_number:
+                raise ValidationError(
+                    self.env._(
+                        "El número de carnet es obligatorio para socios y clientes."
+                    )
+                )
+
+            if not partner.club_birthdate:
+                raise ValidationError(
+                    self.env._(
+                        "La fecha de nacimiento es obligatoria para socios y clientes."
+                    )
+                )
+
+            if partner.club_birthdate > today:
+                raise ValidationError(
+                    self.env._(
+                        "La fecha de nacimiento no puede ser posterior "
+                        "a la fecha actual."
+                    )
+                )
+
+            duplicate = self.search(
+                [
+                    ("id", "!=", partner.id),
+                    ("club_person_type", "in", ("member", "client")),
+                    ("club_id_number", "=", partner.club_id_number),
+                    ("club_id_extension", "=", partner.club_id_extension or False),
+                ],
+                limit=1,
+            )
+
+            if duplicate:
+                raise ValidationError(
+                    self.env._("Ya existe una persona con el mismo carnet y extensión.")
+                )
