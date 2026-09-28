@@ -1,4 +1,4 @@
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class ResPartner(models.Model):
@@ -22,6 +22,24 @@ class ResPartner(models.Model):
 
     club_birthdate = fields.Date(
         string="Fecha de nacimiento",
+    )
+
+    club_age = fields.Integer(
+        string="Edad",
+        compute="_compute_club_age",
+    )
+
+    club_nationality_id = fields.Many2one(
+        comodel_name="res.country",
+        string="Nacionalidad",
+    )
+
+    club_occupation = fields.Char(
+        string="Ocupación",
+    )
+
+    club_title = fields.Char(
+        string="Título",
     )
 
     club_member_code = fields.Char(
@@ -56,3 +74,19 @@ class ResPartner(models.Model):
         string="Estado legal",
         copy=False,
     )
+
+    @api.depends("club_birthdate")
+    def _compute_club_age(self):
+        today = fields.Date.context_today(self)
+
+        for partner in self:
+            if not partner.club_birthdate:
+                partner.club_age = 0
+                continue
+
+            birthdate = partner.club_birthdate
+            partner.club_age = (
+                today.year
+                - birthdate.year
+                - ((today.month, today.day) < (birthdate.month, birthdate.day))
+            )
