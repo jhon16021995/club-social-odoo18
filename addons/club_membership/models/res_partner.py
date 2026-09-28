@@ -53,6 +53,11 @@ class ResPartner(models.Model):
         copy=False,
     )
 
+    club_seniority = fields.Integer(
+        string="Antigüedad",
+        compute="_compute_club_seniority",
+    )
+
     club_member_state = fields.Selection(
         selection=[
             ("active", "Activo"),
@@ -90,6 +95,22 @@ class ResPartner(models.Model):
                 today.year
                 - birthdate.year
                 - ((today.month, today.day) < (birthdate.month, birthdate.day))
+            )
+
+    @api.depends("club_join_date")
+    def _compute_club_seniority(self):
+        today = fields.Date.context_today(self)
+
+        for partner in self:
+            if not partner.club_join_date:
+                partner.club_seniority = 0
+                continue
+
+            join_date = partner.club_join_date
+            partner.club_seniority = (
+                today.year
+                - join_date.year
+                - ((today.month, today.day) < (join_date.month, join_date.day))
             )
 
     @api.constrains(
@@ -175,7 +196,9 @@ class ResPartner(models.Model):
         if not member_code:
             return
 
-        domain = [("club_member_code", "=", member_code)]
+        domain = [
+            ("club_member_code", "=", member_code),
+        ]
 
         if exclude_partner:
             domain.append(("id", "!=", exclude_partner.id))
@@ -188,6 +211,98 @@ class ResPartner(models.Model):
                     code=member_code,
                 )
             )
+
+    def _apply_club_member_defaults(self, vals, partner=None):
+        join_date = partner.club_join_date if partner else False
+        member_state = partner.club_member_state if partner else False
+        legal_state = partner.club_legal_state if partner else False
+
+        if not vals.get("club_join_date") and not join_date:
+            vals["club_join_date"] = fields.Date.context_today(self)
+
+        if not vals.get("club_member_state") and not member_state:
+            vals["club_member_state"] = "active"
+
+        if not vals.get("club_legal_state") and not legal_state:
+            vals["club_legal_state"] = "regular"
+
+    def _get_club_member_code_for_write(
+        self,
+        partner,
+        vals,
+        new_id_number,
+        new_id_extension,
+    ):
+        becoming_member = partner.club_person_type != "member"
+
+        number_changed = (
+            "club_id_number" in vals and new_id_number != partner.club_id_number
+        )
+
+        if becoming_member or number_changed:
+            return self._build_club_member_code(
+                new_id_number,
+                new_id_extension,
+                exclude_partner=partner,
+            )
+
+        extension_changed = (
+            "club_id_extension" in vals
+            and new_id_extension != partner.club_id_extension
+        )
+
+        if not extension_changed:
+            return partner.club_member_code
+
+        if partner.club_member_code == partner.club_id_number:
+            return new_id_number
+
+        suffix = new_id_extension or "SINEXT"
+        return f"{new_id_number}-{suffix}"
+
+    def _prepare_club_member_write_vals(self, partner, vals):
+        partner_vals = dict(vals)
+
+        new_person_type = partner_vals.get(
+            "club_person_type",
+            partner.club_person_type,
+        )
+
+        if new_person_type != "member":
+            partner_vals["club_member_code"] = False
+            return partner_vals
+
+        if partner.club_person_type != "member":
+            self._apply_club_member_defaults(
+                partner_vals,
+                partner=partner,
+            )
+
+        new_id_number = partner_vals.get(
+            "club_id_number",
+            partner.club_id_number,
+        )
+
+        new_id_extension = partner_vals.get(
+            "club_id_extension",
+            partner.club_id_extension,
+        )
+
+        member_code = self._get_club_member_code_for_write(
+            partner,
+            partner_vals,
+            new_id_number,
+            new_id_extension,
+        )
+
+        self._check_club_member_code_available(
+            member_code,
+            exclude_partner=partner,
+        )
+
+        partner_vals["club_member_code"] = member_code
+
+        return partner_vals
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -202,6 +317,8 @@ class ResPartner(models.Model):
                 vals["club_member_code"] = False
                 prepared_vals_list.append(vals)
                 continue
+
+            self._apply_club_member_defaults(vals)
 
             id_number = vals.get("club_id_number")
             id_extension = vals.get("club_id_extension")
@@ -229,7 +346,9 @@ class ResPartner(models.Model):
                 member_code = id_number
 
             code_exists = self.search(
-                [("club_member_code", "=", member_code)],
+                [
+                    ("club_member_code", "=", member_code),
+                ],
                 limit=1,
             )
 
@@ -267,60 +386,10 @@ class ResPartner(models.Model):
             return super().write(vals)
 
         for partner in self:
-            partner_vals = dict(vals)
-
-            new_person_type = partner_vals.get(
-                "club_person_type",
-                partner.club_person_type,
+            partner_vals = self._prepare_club_member_write_vals(
+                partner,
+                vals,
             )
-
-            if new_person_type != "member":
-                partner_vals["club_member_code"] = False
-                super(ResPartner, partner).write(partner_vals)
-                continue
-
-            new_id_number = partner_vals.get(
-                "club_id_number",
-                partner.club_id_number,
-            )
-            new_id_extension = partner_vals.get(
-                "club_id_extension",
-                partner.club_id_extension,
-            )
-
-            number_changed = (
-                "club_id_number" in partner_vals
-                and new_id_number != partner.club_id_number
-            )
-
-            becoming_member = partner.club_person_type != "member"
-
-            extension_changed = (
-                "club_id_extension" in partner_vals
-                and new_id_extension != partner.club_id_extension
-            )
-
-            if becoming_member or number_changed:
-                member_code = self._build_club_member_code(
-                    new_id_number,
-                    new_id_extension,
-                    exclude_partner=partner,
-                )
-            elif extension_changed:
-                if partner.club_member_code == partner.club_id_number:
-                    member_code = new_id_number
-                else:
-                    suffix = new_id_extension or "SINEXT"
-                    member_code = f"{new_id_number}-{suffix}"
-            else:
-                member_code = partner.club_member_code
-
-            self._check_club_member_code_available(
-                member_code,
-                exclude_partner=partner,
-            )
-
-            partner_vals["club_member_code"] = member_code
 
             super(ResPartner, partner).write(partner_vals)
 
