@@ -1,0 +1,17 @@
+[MASTER]
+load-plugins=pylint_odoo
+
+[ODOOLINT]
+valid-odoo-versions=18.0
+
+[MESSAGES CONTROL]
+disable=
+    missing-module-docstring,
+    missing-class-docstring,
+    missing-function-docstring,
+    invalid-name,
+    too-few-public-methods,
+    manifest-required-author
+
+[FORMAT]
+max-line-length=88

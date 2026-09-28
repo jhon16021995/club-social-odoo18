@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Entornos virtuales
+.venv/
+venv/
+
+# Herramientas de calidad
+.ruff_cache/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Odoo runtime
+*.log
+*.pid
+sessions/
+filestore/
+
+# Configuración local / secretos
+.env
+.env.*
+odoo.conf
+
+# IDE
+.idea/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos temporales
+*.swp
+*.swo
+*~
