@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_partner_form_club_kardex" model="ir.ui.view">
+        <field name="name">res.partner.form.club.kardex</field>
+        <field name="model">res.partner</field>
+        <field
+            name="inherit_id"
+            ref="view_partner_form_club_membership"
+        />
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page
+                    string="Kardex / Historial"
+                    name="club_kardex"
+                >
+                    <field
+                        name="club_kardex_event_ids"
+                        readonly="1"
+                        mode="list,form"
+                    >
+                        <list
+                            string="Kardex / Historial"
+                            create="false"
+                            edit="false"
+                            delete="false"
+                        >
+                            <field
+                                name="event_datetime"
+                                string="Fecha y hora"
+                            />
+
+                            <field
+                                name="event_type"
+                                string="Evento"
+                            />
+
+                            <field
+                                name="description"
+                                string="Descripción"
+                            />
+
+                            <field
+                                name="user_id"
+                                string="Usuario"
+                            />
+
+                            <field
+                                name="origin"
+                                string="Origen"
+                            />
+
+                            <field
+                                name="beneficiary_id"
+                                string="Beneficiario"
+                                optional="hide"
+                            />
+
+                            <field
+                                name="reason"
+                                string="Motivo"
+                                optional="show"
+                            />
+
+                            <field
+                                name="old_value"
+                                string="Valor anterior"
+                                optional="hide"
+                            />
+
+                            <field
+                                name="new_value"
+                                string="Valor nuevo"
+                                optional="hide"
+                            />
+                        </list>
+
+                        <form
+                            string="Evento de Kardex"
+                            create="false"
+                            edit="false"
+                            delete="false"
+                        >
+                            <sheet>
+                                <group>
+                                    <group string="Evento">
+                                        <field
+                                            name="event_datetime"
+                                            readonly="1"
+                                        />
+
+                                        <field
+                                            name="event_type"
+                                            readonly="1"
+                                        />
+
+                                        <field
+                                            name="description"
+                                            readonly="1"
+                                        />
+
+                                        <field
+                                            name="origin"
+                                            readonly="1"
+                                        />
+                                    </group>
+
+                                    <group string="Responsable">
+                                        <field
+                                            name="user_id"
+                                            readonly="1"
+                                        />
+
+                                        <field
+                                            name="beneficiary_id"
+                                            readonly="1"
+                                            invisible="not beneficiary_id"
+                                        />
+                                    </group>
+                                </group>
+
+                                <group>
+                                    <group string="Valor anterior">
+                                        <field
+                                            name="old_value"
+                                            readonly="1"
+                                            nolabel="1"
+                                        />
+                                    </group>
+
+                                    <group string="Valor nuevo">
+                                        <field
+                                            name="new_value"
+                                            readonly="1"
+                                            nolabel="1"
+                                        />
+                                    </group>
+                                </group>
+
+                                <group
+                                    string="Motivo"
+                                    invisible="not reason"
+                                >
+                                    <field
+                                        name="reason"
+                                        readonly="1"
+                                        nolabel="1"
+                                    />
+                                </group>
+                            </sheet>
+                        </form>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>
