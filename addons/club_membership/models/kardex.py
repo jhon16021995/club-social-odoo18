@@ -45,7 +45,10 @@ class ClubKardexEvent(models.Model):
                 "member_identity_updated",
                 "Modificación de identificación",
             ),
-            ("member_code_changed", "Cambio de código de asociado"),
+            (
+                "member_code_changed",
+                "Cambio de código de asociado",
+            ),
             (
                 "member_join_date_changed",
                 "Cambio de fecha de ingreso",
@@ -86,6 +89,18 @@ class ClubKardexEvent(models.Model):
                 "member_created_from_beneficiary",
                 "Alta proveniente de beneficiario",
             ),
+            (
+                "certificate_created",
+                "Registro de certificado patrimonial",
+            ),
+            (
+                "certificate_updated",
+                "Modificación de certificado patrimonial",
+            ),
+            (
+                "certificate_state_changed",
+                "Cambio de estado del certificado",
+            ),
         ],
         string="Tipo de evento",
         required=True,
@@ -117,6 +132,13 @@ class ClubKardexEvent(models.Model):
     beneficiary_id = fields.Many2one(
         comodel_name="club.beneficiary",
         string="Beneficiario relacionado",
+        readonly=True,
+        ondelete="restrict",
+    )
+
+    certificate_id = fields.Many2one(
+        comodel_name="club.certificate",
+        string="Certificado relacionado",
         readonly=True,
         ondelete="restrict",
     )
@@ -181,6 +203,15 @@ class ClubKardexEvent(models.Model):
             )
 
         beneficiary = event_data.get("beneficiary")
+        certificate = event_data.get("certificate")
+
+        if certificate and certificate.member_id != member:
+            raise ValidationError(
+                self.env._(
+                    "El certificado relacionado debe pertenecer "
+                    "al mismo socio del evento de Kardex."
+                )
+            )
 
         vals = {
             "member_id": member.id,
@@ -191,7 +222,8 @@ class ClubKardexEvent(models.Model):
             "old_value": event_data.get("old_value") or False,
             "new_value": event_data.get("new_value") or False,
             "reason": event_data.get("reason") or False,
-            "beneficiary_id": beneficiary.id if beneficiary else False,
+            "beneficiary_id": (beneficiary.id if beneficiary else False),
+            "certificate_id": (certificate.id if certificate else False),
             "origin": origin,
         }
 

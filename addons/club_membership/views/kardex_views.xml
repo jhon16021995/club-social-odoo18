@@ -28,45 +28,42 @@
                                 name="event_datetime"
                                 string="Fecha y hora"
                             />
-
                             <field
                                 name="event_type"
                                 string="Evento"
                             />
-
                             <field
                                 name="description"
                                 string="Descripción"
                             />
-
                             <field
                                 name="user_id"
                                 string="Usuario"
                             />
-
                             <field
                                 name="origin"
                                 string="Origen"
                             />
-
                             <field
                                 name="beneficiary_id"
                                 string="Beneficiario"
                                 optional="hide"
                             />
-
+                            <field
+                                name="certificate_id"
+                                string="Certificado"
+                                optional="hide"
+                            />
                             <field
                                 name="reason"
                                 string="Motivo"
                                 optional="show"
                             />
-
                             <field
                                 name="old_value"
                                 string="Valor anterior"
                                 optional="hide"
                             />
-
                             <field
                                 name="new_value"
                                 string="Valor nuevo"
@@ -87,24 +84,21 @@
                                             name="event_datetime"
                                             readonly="1"
                                         />
-
                                         <field
                                             name="event_type"
                                             readonly="1"
                                         />
-
                                         <field
                                             name="description"
                                             readonly="1"
                                         />
-
                                         <field
                                             name="origin"
                                             readonly="1"
                                         />
                                     </group>
 
-                                    <group string="Responsable">
+                                    <group string="Responsable y referencia">
                                         <field
                                             name="user_id"
                                             readonly="1"
@@ -114,6 +108,12 @@
                                             name="beneficiary_id"
                                             readonly="1"
                                             invisible="not beneficiary_id"
+                                        />
+
+                                        <field
+                                            name="certificate_id"
+                                            readonly="1"
+                                            invisible="not certificate_id"
                                         />
                                     </group>
                                 </group>

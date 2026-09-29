@@ -130,6 +130,13 @@ class ResPartner(models.Model):
         copy=False,
     )
 
+    club_certificate_ids = fields.One2many(
+        comodel_name="club.certificate",
+        inverse_name="member_id",
+        string="Certificado Patrimonial",
+        copy=False,
+    )
+
     club_kardex_event_ids = fields.One2many(
         comodel_name="club.kardex.event",
         inverse_name="member_id",

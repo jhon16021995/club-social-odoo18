@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_partner_form_club_certificate" model="ir.ui.view">
+        <field name="name">res.partner.form.club.certificate</field>
+        <field name="model">res.partner</field>
+        <field
+            name="inherit_id"
+            ref="view_partner_form_club_membership"
+        />
+        <field name="arch" type="xml">
+            <xpath
+                expr="//page[@name='club_beneficiaries']"
+                position="after"
+            >
+                <page
+                    string="Certificado Patrimonial"
+                    name="club_certificate"
+                >
+                    <field
+                        name="club_certificate_ids"
+                        mode="list,form"
+                    >
+                        <list
+                            string="Certificado Patrimonial"
+                            create="true"
+                            delete="false"
+                        >
+                            <field
+                                name="certificate_number"
+                                string="Número"
+                                readonly="1"
+                            />
+
+                            <field
+                                name="registration_origin"
+                                string="Origen"
+                            />
+
+                            <field
+                                name="certificate_type"
+                                string="Tipo"
+                                readonly="1"
+                            />
+
+                            <field name="state"/>
+
+                            <field
+                                name="total_value"
+                                string="Valor total (Bs)"
+                            />
+
+                            <field
+                                name="opening_balance"
+                                string="Saldo inicial (Bs)"
+                                optional="hide"
+                            />
+
+                            <field
+                                name="opening_paid_amount"
+                                string="Pagado histórico (Bs)"
+                                readonly="1"
+                                optional="hide"
+                            />
+
+                            <field
+                                name="issue_date"
+                                string="Fecha de emisión"
+                            />
+                        </list>
+
+                        <form string="Certificado Patrimonial">
+                            <sheet>
+                                <field
+                                    name="member_id"
+                                    invisible="1"
+                                />
+
+                                <div class="oe_title">
+                                    <label
+                                        for="certificate_number"
+                                        string="Número de certificado"
+                                    />
+                                    <h1>
+                                        <field
+                                            name="certificate_number"
+                                            readonly="1"
+                                        />
+                                    </h1>
+                                </div>
+
+                                <group>
+                                    <group string="Datos del certificado">
+                                        <field
+                                            name="registration_origin"
+                                            string="Origen del registro"
+                                        />
+
+                                        <field
+                                            name="certificate_type"
+                                            readonly="1"
+                                        />
+
+                                        <field name="state"/>
+
+                                        <field
+                                            name="issue_date"
+                                            string="Fecha de emisión"
+                                        />
+                                    </group>
+
+                                    <group string="Valor del certificado">
+                                        <field
+                                            name="total_value"
+                                            string="Valor total (Bs)"
+                                        />
+
+                                        <field
+                                            name="opening_balance"
+                                            string="Deuda al momento de migración (Bs)"
+                                            invisible="registration_origin != 'migrated'"
+                                            required="registration_origin == 'migrated'"
+                                        />
+
+                                        <field
+                                            name="opening_paid_amount"
+                                            string="Pagado antes de la migración (Bs)"
+                                            readonly="1"
+                                            invisible="registration_origin != 'migrated'"
+                                        />
+                                    </group>
+                                </group>
+
+                                <group
+                                    string="Situación inicial"
+                                    invisible="registration_origin != 'new'"
+                                >
+                                    <group>
+                                        <label
+                                            for="opening_balance"
+                                            string="Saldo inicial"
+                                        />
+                                        <div>
+                                            <field
+                                                name="opening_balance"
+                                                readonly="1"
+                                                nolabel="1"
+                                            />
+                                            <span> Bs</span>
+                                        </div>
+                                    </group>
+
+                                    <group>
+                                        <label
+                                            for="opening_paid_amount"
+                                            string="Pagado previamente"
+                                        />
+                                        <div>
+                                            <field
+                                                name="opening_paid_amount"
+                                                readonly="1"
+                                                nolabel="1"
+                                            />
+                                            <span> Bs</span>
+                                        </div>
+                                    </group>
+                                </group>
+
+                                <group string="Observaciones">
+                                    <field
+                                        name="observations"
+                                        nolabel="1"
+                                        placeholder="Observaciones administrativas del certificado..."
+                                    />
+                                </group>
+                            </sheet>
+                        </form>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -14,6 +14,7 @@
         "security/ir.model.access.csv",
         "data/beneficiary_cron.xml",
         "views/res_partner_views.xml",
+        "views/certificate_views.xml",
         "views/kardex_views.xml",
     ],
     "application": True,
