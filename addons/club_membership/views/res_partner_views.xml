@@ -183,12 +183,23 @@
                                         string="Motivo de bloqueo"
                                         optional="show"
                                     />
+
+                                    <field
+                                        name="converted_member_id"
+                                        string="Convertido en socio"
+                                        optional="hide"
+                                    />
                                 </list>
 
                                 <form string="Beneficiario">
                                     <sheet>
                                         <field
                                             name="member_id"
+                                            invisible="1"
+                                        />
+
+                                        <field
+                                            name="converted_member_id"
                                             invisible="1"
                                         />
 
@@ -201,6 +212,7 @@
                                                 <field
                                                     name="name"
                                                     placeholder="Nombre completo"
+                                                    readonly="converted_member_id"
                                                 />
                                             </h1>
                                         </div>
@@ -210,11 +222,13 @@
                                                 <field
                                                     name="relationship"
                                                     string="Parentesco"
+                                                    readonly="converted_member_id"
                                                 />
 
                                                 <field
                                                     name="birthdate"
                                                     string="Fecha de nacimiento"
+                                                    readonly="converted_member_id"
                                                 />
 
                                                 <field
@@ -228,11 +242,13 @@
                                                 <field
                                                     name="id_number"
                                                     string="Número de carnet"
+                                                    readonly="converted_member_id"
                                                 />
 
                                                 <field
                                                     name="id_extension"
                                                     string="Extensión"
+                                                    readonly="converted_member_id"
                                                 />
                                             </group>
                                         </group>
@@ -242,6 +258,7 @@
                                                 <field
                                                     name="state"
                                                     string="Estado"
+                                                    readonly="converted_member_id"
                                                 />
                                             </group>
 
@@ -251,6 +268,28 @@
                                                     string="Motivo de bloqueo"
                                                     invisible="state != 'blocked'"
                                                     required="state == 'blocked'"
+                                                    readonly="converted_member_id"
+                                                />
+                                            </group>
+                                        </group>
+
+                                        <group
+                                            string="Conversión a socio"
+                                            invisible="not converted_member_id"
+                                        >
+                                            <group>
+                                                <field
+                                                    name="converted_member_id"
+                                                    string="Socio resultante"
+                                                    readonly="1"
+                                                />
+                                            </group>
+
+                                            <group>
+                                                <field
+                                                    name="converted_at"
+                                                    string="Fecha de conversión"
+                                                    readonly="1"
                                                 />
                                             </group>
                                         </group>
@@ -261,6 +300,305 @@
                     </notebook>
                 </sheet>
             </form>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         LISTA GENERAL DE BENEFICIARIOS
+         ============================================================ -->
+
+    <record id="view_club_beneficiary_list" model="ir.ui.view">
+        <field name="name">club.beneficiary.list</field>
+        <field name="model">club.beneficiary</field>
+        <field name="arch" type="xml">
+            <list
+                string="Beneficiarios"
+                create="false"
+                delete="false"
+                decoration-success="state == 'active'"
+                decoration-danger="state == 'blocked'"
+            >
+                <field name="name"/>
+
+                <field
+                    name="member_id"
+                    string="Socio titular"
+                />
+
+                <field
+                    name="relationship"
+                    string="Parentesco"
+                />
+
+                <field
+                    name="id_number"
+                    string="Carnet"
+                />
+
+                <field
+                    name="id_extension"
+                    string="Extensión"
+                />
+
+                <field
+                    name="age"
+                    string="Edad"
+                />
+
+                <field name="state"/>
+
+                <field
+                    name="block_reason"
+                    string="Motivo de bloqueo"
+                    optional="hide"
+                />
+
+                <field
+                    name="converted_member_id"
+                    string="Socio convertido"
+                    optional="hide"
+                />
+
+                <field
+                    name="converted_at"
+                    string="Fecha de conversión"
+                    optional="hide"
+                />
+            </list>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         FORMULARIO GENERAL DE BENEFICIARIO
+         ============================================================ -->
+
+    <record id="view_club_beneficiary_form" model="ir.ui.view">
+        <field name="name">club.beneficiary.form</field>
+        <field name="model">club.beneficiary</field>
+        <field name="arch" type="xml">
+            <form
+                string="Beneficiario"
+                create="false"
+                delete="false"
+            >
+                <header>
+                    <button
+                        name="action_convert_to_member"
+                        type="object"
+                        string="Convertir en Socio"
+                        class="oe_highlight"
+                        invisible="converted_member_id"
+                    />
+                </header>
+
+                <sheet>
+                    <field
+                        name="converted_member_id"
+                        invisible="1"
+                    />
+
+                    <div class="oe_title">
+                        <label
+                            for="name"
+                            string="Nombre completo"
+                        />
+                        <h1>
+                            <field
+                                name="name"
+                                placeholder="Nombre completo"
+                                readonly="converted_member_id"
+                            />
+                        </h1>
+                    </div>
+
+                    <group>
+                        <group string="Vínculo con el Club">
+                            <field
+                                name="member_id"
+                                string="Socio titular"
+                                readonly="1"
+                            />
+
+                            <field
+                                name="relationship"
+                                string="Parentesco"
+                                readonly="converted_member_id"
+                            />
+                        </group>
+
+                        <group string="Datos personales">
+                            <field
+                                name="birthdate"
+                                string="Fecha de nacimiento"
+                                readonly="converted_member_id"
+                            />
+
+                            <field
+                                name="age"
+                                string="Edad"
+                                readonly="1"
+                            />
+                        </group>
+                    </group>
+
+                    <group>
+                        <group string="Identificación">
+                            <field
+                                name="id_number"
+                                string="Número de carnet"
+                                readonly="converted_member_id"
+                            />
+
+                            <field
+                                name="id_extension"
+                                string="Extensión"
+                                readonly="converted_member_id"
+                            />
+                        </group>
+
+                        <group string="Estado del beneficiario">
+                            <field
+                                name="state"
+                                string="Estado"
+                                readonly="converted_member_id"
+                            />
+
+                            <field
+                                name="block_reason"
+                                string="Motivo de bloqueo"
+                                invisible="state != 'blocked'"
+                                required="state == 'blocked'"
+                                readonly="converted_member_id"
+                            />
+                        </group>
+                    </group>
+
+                    <group
+                        string="Conversión a socio"
+                        invisible="not converted_member_id"
+                    >
+                        <group>
+                            <field
+                                name="converted_member_id"
+                                string="Socio resultante"
+                                readonly="1"
+                            />
+                        </group>
+
+                        <group>
+                            <field
+                                name="converted_at"
+                                string="Fecha de conversión"
+                                readonly="1"
+                            />
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         BÚSQUEDA GENERAL DE BENEFICIARIOS
+         ============================================================ -->
+
+    <record id="view_club_beneficiary_search" model="ir.ui.view">
+        <field name="name">club.beneficiary.search</field>
+        <field name="model">club.beneficiary</field>
+        <field name="arch" type="xml">
+            <search string="Buscar beneficiarios">
+                <field
+                    name="name"
+                    string="Nombre, carnet o socio titular"
+                    filter_domain="[
+                        '|', '|', '|',
+                        ('name', 'ilike', self),
+                        ('id_number', 'ilike', self),
+                        ('id_extension', 'ilike', self),
+                        ('member_id', 'ilike', self)
+                    ]"
+                />
+
+                <field
+                    name="member_id"
+                    string="Socio titular"
+                />
+
+                <field
+                    name="id_number"
+                    string="Carnet"
+                />
+
+                <field
+                    name="id_extension"
+                    string="Extensión"
+                />
+
+                <field
+                    name="relationship"
+                    string="Parentesco"
+                />
+
+                <field name="state"/>
+
+                <separator/>
+
+                <filter
+                    string="Activos"
+                    name="beneficiary_active"
+                    domain="[('state', '=', 'active')]"
+                />
+
+                <filter
+                    string="Bloqueados"
+                    name="beneficiary_blocked"
+                    domain="[('state', '=', 'blocked')]"
+                />
+
+                <filter
+                    string="Hijos"
+                    name="beneficiary_children"
+                    domain="[('relationship', '=', 'child')]"
+                />
+
+                <filter
+                    string="Hijastros"
+                    name="beneficiary_stepchildren"
+                    domain="[('relationship', '=', 'stepchild')]"
+                />
+
+                <filter
+                    string="Trabajadores"
+                    name="beneficiary_workers"
+                    domain="[('relationship', '=', 'worker')]"
+                />
+
+                <filter
+                    string="Convertidos en socio"
+                    name="beneficiary_converted"
+                    domain="[('converted_member_id', '!=', False)]"
+                />
+
+                <group expand="0" string="Agrupar por">
+                    <filter
+                        string="Socio titular"
+                        name="group_beneficiary_member"
+                        context="{'group_by': 'member_id'}"
+                    />
+
+                    <filter
+                        string="Parentesco"
+                        name="group_beneficiary_relationship"
+                        context="{'group_by': 'relationship'}"
+                    />
+
+                    <filter
+                        string="Estado"
+                        name="group_beneficiary_state"
+                        context="{'group_by': 'state'}"
+                    />
+                </group>
+            </search>
         </field>
     </record>
 
@@ -537,6 +875,58 @@
     </record>
 
     <!-- ============================================================
+         ACCIÓN GENERAL DE BENEFICIARIOS
+         ============================================================ -->
+
+    <record id="action_club_beneficiaries" model="ir.actions.act_window">
+        <field name="name">Beneficiarios</field>
+        <field name="res_model">club.beneficiary</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" eval="False"/>
+        <field
+            name="search_view_id"
+            ref="view_club_beneficiary_search"
+        />
+        <field name="context">
+            {
+                'create': False
+            }
+        </field>
+    </record>
+
+    <record
+        id="action_club_beneficiaries_view_list"
+        model="ir.actions.act_window.view"
+    >
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">list</field>
+        <field
+            name="view_id"
+            ref="view_club_beneficiary_list"
+        />
+        <field
+            name="act_window_id"
+            ref="action_club_beneficiaries"
+        />
+    </record>
+
+    <record
+        id="action_club_beneficiaries_view_form"
+        model="ir.actions.act_window.view"
+    >
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">form</field>
+        <field
+            name="view_id"
+            ref="view_club_beneficiary_form"
+        />
+        <field
+            name="act_window_id"
+            ref="action_club_beneficiaries"
+        />
+    </record>
+
+    <!-- ============================================================
          MENÚ
          ============================================================ -->
 
@@ -560,5 +950,13 @@
         parent="menu_club_social_root"
         action="action_club_clients"
         sequence="20"
+    />
+
+    <menuitem
+        id="menu_club_beneficiaries"
+        name="Beneficiarios"
+        parent="menu_club_social_root"
+        action="action_club_beneficiaries"
+        sequence="30"
     />
 </odoo>
