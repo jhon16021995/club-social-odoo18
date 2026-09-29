@@ -1,1 +1,1 @@
-from . import beneficiary, res_partner
+from . import beneficiary, kardex, res_partner
