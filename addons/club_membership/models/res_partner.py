@@ -92,6 +92,13 @@ class ResPartner(models.Model):
         copy=False,
     )
 
+    club_beneficiary_ids = fields.One2many(
+        comodel_name="club.beneficiary",
+        inverse_name="member_id",
+        string="Beneficiarios",
+        copy=False,
+    )
+
     @api.depends(
         "club_birthdate",
         "is_company",
@@ -135,6 +142,7 @@ class ResPartner(models.Model):
         "is_company",
     )
     def _check_club_personal_data(self):
+        Beneficiary = self.env["club.beneficiary"]
         today = fields.Date.context_today(self)
 
         for partner in self:
@@ -146,6 +154,13 @@ class ResPartner(models.Model):
                     self.env._(
                         "El número de carnet es obligatorio para socios y clientes."
                     )
+                )
+
+            if not partner.club_id_number.isascii() or not (
+                partner.club_id_number.isdigit()
+            ):
+                raise ValidationError(
+                    self.env._("El número de carnet debe contener únicamente números.")
                 )
 
             if not partner.is_company:
@@ -178,6 +193,29 @@ class ResPartner(models.Model):
             if duplicate:
                 raise ValidationError(
                     self.env._("Ya existe una persona con el mismo carnet y extensión.")
+                )
+
+            duplicate_beneficiary = Beneficiary.search(
+                [
+                    (
+                        "id_number",
+                        "=",
+                        partner.club_id_number,
+                    ),
+                    (
+                        "id_extension",
+                        "=",
+                        partner.club_id_extension or False,
+                    ),
+                ],
+                limit=1,
+            )
+
+            if duplicate_beneficiary:
+                raise ValidationError(
+                    self.env._(
+                        "Ya existe un beneficiario con el mismo carnet y extensión."
+                    )
                 )
 
     def _build_club_member_code(

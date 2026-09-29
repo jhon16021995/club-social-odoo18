@@ -1,1 +1,1 @@
-from . import res_partner
+from . import beneficiary, res_partner
