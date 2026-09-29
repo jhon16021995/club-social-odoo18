@@ -79,6 +79,21 @@ class ClubBeneficiary(models.Model):
         copy=False,
     )
 
+    converted_member_id = fields.Many2one(
+        comodel_name="res.partner",
+        string="Socio convertido",
+        copy=False,
+        readonly=True,
+        ondelete="restrict",
+        domain=[("club_person_type", "=", "member")],
+    )
+
+    converted_at = fields.Datetime(
+        string="Fecha de conversión a socio",
+        copy=False,
+        readonly=True,
+    )
+
     @api.depends("birthdate")
     def _compute_age(self):
         today = fields.Date.context_today(self)
@@ -130,7 +145,9 @@ class ClubBeneficiary(models.Model):
             and self._get_age_from_birthdate(birthdate) >= 25
         ):
             prepared_vals["state"] = "blocked"
-            prepared_vals["block_reason"] = self.env._("Límite de edad alcanzado")
+
+            if not prepared_vals.get("block_reason"):
+                prepared_vals["block_reason"] = self.env._("Límite de edad alcanzado")
 
         elif prepared_vals.get("state") == "active":
             prepared_vals["block_reason"] = False
@@ -190,6 +207,7 @@ class ClubBeneficiary(models.Model):
     @api.constrains(
         "id_number",
         "id_extension",
+        "converted_member_id",
     )
     def _check_identity(self):
         Partner = self.env["res.partner"]
@@ -243,7 +261,10 @@ class ClubBeneficiary(models.Model):
                 limit=1,
             )
 
-            if duplicate_partner:
+            if (
+                duplicate_partner
+                and duplicate_partner != beneficiary.converted_member_id
+            ):
                 raise ValidationError(
                     self.env._(
                         "Ya existe un socio o cliente con el mismo carnet y extensión."
@@ -271,6 +292,14 @@ class ClubBeneficiary(models.Model):
 
     def write(self, vals):
         for beneficiary in self:
+            if beneficiary.converted_member_id and vals.get("state") == "active":
+                raise ValidationError(
+                    self.env._(
+                        "Un beneficiario convertido en socio no puede "
+                        "reactivarse como beneficiario."
+                    )
+                )
+
             prepared_vals = self._prepare_age_block_values(
                 vals,
                 beneficiary=beneficiary,
@@ -279,6 +308,55 @@ class ClubBeneficiary(models.Model):
             super(ClubBeneficiary, beneficiary).write(prepared_vals)
 
         return True
+
+    def action_convert_to_member(self):
+        self.ensure_one()
+
+        if self.converted_member_id:
+            raise ValidationError(
+                self.env._("Este beneficiario ya fue convertido en socio.")
+            )
+
+        member = (
+            self.env["res.partner"]
+            .with_context(club_conversion_beneficiary_id=self.id)
+            .create(
+                {
+                    "name": self.name,
+                    "club_person_type": "member",
+                    "club_id_number": self.id_number,
+                    "club_id_extension": self.id_extension,
+                    "club_birthdate": self.birthdate,
+                    "is_company": False,
+                }
+            )
+        )
+
+        self.write(
+            {
+                "state": "blocked",
+                "block_reason": self.env._("Convertido en socio"),
+                "converted_member_id": member.id,
+                "converted_at": fields.Datetime.now(),
+            }
+        )
+
+        return {
+            "type": "ir.actions.act_window",
+            "name": self.env._("Socio"),
+            "res_model": "res.partner",
+            "res_id": member.id,
+            "view_mode": "form",
+            "views": [
+                (
+                    self.env.ref(
+                        "club_membership.view_partner_form_club_membership"
+                    ).id,
+                    "form",
+                )
+            ],
+            "target": "current",
+        }
 
     @api.model
     def _cron_block_age_limit_beneficiaries(self):
@@ -291,6 +369,7 @@ class ClubBeneficiary(models.Model):
                 ),
                 ("birthdate", "!=", False),
                 ("state", "=", "active"),
+                ("converted_member_id", "=", False),
             ]
         )
 

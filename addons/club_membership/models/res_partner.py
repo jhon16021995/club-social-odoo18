@@ -99,6 +99,13 @@ class ResPartner(models.Model):
         copy=False,
     )
 
+    club_origin_beneficiary_ids = fields.One2many(
+        comodel_name="club.beneficiary",
+        inverse_name="converted_member_id",
+        string="Origen como beneficiario",
+        copy=False,
+    )
+
     @api.depends(
         "club_birthdate",
         "is_company",
@@ -145,6 +152,10 @@ class ResPartner(models.Model):
         Beneficiary = self.env["club.beneficiary"]
         today = fields.Date.context_today(self)
 
+        conversion_beneficiary_id = self.env.context.get(
+            "club_conversion_beneficiary_id"
+        )
+
         for partner in self:
             if partner.club_person_type not in ("member", "client"):
                 continue
@@ -185,7 +196,11 @@ class ResPartner(models.Model):
                     ("id", "!=", partner.id),
                     ("club_person_type", "in", ("member", "client")),
                     ("club_id_number", "=", partner.club_id_number),
-                    ("club_id_extension", "=", partner.club_id_extension or False),
+                    (
+                        "club_id_extension",
+                        "=",
+                        partner.club_id_extension or False,
+                    ),
                 ],
                 limit=1,
             )
@@ -211,7 +226,11 @@ class ResPartner(models.Model):
                 limit=1,
             )
 
-            if duplicate_beneficiary:
+            if (
+                duplicate_beneficiary
+                and duplicate_beneficiary.id != conversion_beneficiary_id
+                and duplicate_beneficiary.converted_member_id != partner
+            ):
                 raise ValidationError(
                     self.env._(
                         "Ya existe un beneficiario con el mismo carnet y extensión."
