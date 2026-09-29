@@ -12,6 +12,14 @@ class ClubBeneficiary(models.Model):
         "stepchild",
     }
 
+    _KARDEX_TRACKED_FIELDS = (
+        "name",
+        "relationship",
+        "birthdate",
+        "id_number",
+        "id_extension",
+    )
+
     member_id = fields.Many2one(
         comodel_name="res.partner",
         string="Socio titular",
@@ -126,23 +134,30 @@ class ClubBeneficiary(models.Model):
         )
 
     @api.model
-    def _prepare_age_block_values(self, vals, beneficiary=None):
-        prepared_vals = dict(vals)
-
-        relationship = prepared_vals.get(
+    def _is_age_limit_reached(self, vals, beneficiary=None):
+        relationship = vals.get(
             "relationship",
             beneficiary.relationship if beneficiary else False,
         )
 
-        birthdate = prepared_vals.get(
+        birthdate = vals.get(
             "birthdate",
             beneficiary.birthdate if beneficiary else False,
         )
 
-        if (
+        return bool(
             relationship in self._AGE_LIMITED_RELATIONSHIPS
             and birthdate
             and self._get_age_from_birthdate(birthdate) >= 25
+        )
+
+    @api.model
+    def _prepare_age_block_values(self, vals, beneficiary=None):
+        prepared_vals = dict(vals)
+
+        if self._is_age_limit_reached(
+            prepared_vals,
+            beneficiary=beneficiary,
         ):
             prepared_vals["state"] = "blocked"
 
@@ -282,16 +297,276 @@ class ClubBeneficiary(models.Model):
                     self.env._("Debe indicar el motivo de bloqueo del beneficiario.")
                 )
 
+    def _format_kardex_value(self, beneficiary, field_name):
+        field = beneficiary._fields[field_name]
+        value = beneficiary[field_name]
+
+        if not value:
+            return self.env._("Sin valor")
+
+        if field.type == "many2one":
+            return value.display_name
+
+        if field.type == "selection":
+            field_description = beneficiary.fields_get([field_name])[field_name]
+
+            selection = dict(field_description.get("selection", []))
+
+            return selection.get(value, value)
+
+        if field.type == "date":
+            return fields.Date.to_string(value)
+
+        return str(value)
+
+    def _get_kardex_snapshot(self, beneficiary):
+        field_names = (
+            *self._KARDEX_TRACKED_FIELDS,
+            "state",
+            "block_reason",
+        )
+
+        return {
+            field_name: self._format_kardex_value(
+                beneficiary,
+                field_name,
+            )
+            for field_name in field_names
+        }
+
+    def _build_kardex_change_values(
+        self,
+        beneficiary,
+        before_values,
+        field_names,
+    ):
+        old_lines = []
+        new_lines = []
+
+        for field_name in field_names:
+            old_value = before_values[field_name]
+            new_value = self._format_kardex_value(
+                beneficiary,
+                field_name,
+            )
+
+            if old_value == new_value:
+                continue
+
+            field_label = beneficiary._fields[field_name].string
+
+            old_lines.append(f"{field_label}: {old_value}")
+            new_lines.append(f"{field_label}: {new_value}")
+
+        return "\n".join(old_lines), "\n".join(new_lines)
+
+    def _log_kardex_event(
+        self,
+        beneficiary,
+        event_type,
+        description,
+        **event_data,
+    ):
+        Kardex = self.env["club.kardex.event"]
+
+        return Kardex._log_event(  # pylint: disable=protected-access
+            beneficiary.member_id,
+            event_type,
+            description,
+            beneficiary=beneficiary,
+            **event_data,
+        )
+
+    def _log_beneficiary_created(self, beneficiary):
+        new_value = "\n".join(
+            [
+                self.env._(
+                    "Parentesco: %(value)s",
+                    value=self._format_kardex_value(
+                        beneficiary,
+                        "relationship",
+                    ),
+                ),
+                self.env._(
+                    "Carnet: %(value)s",
+                    value=beneficiary.id_number,
+                ),
+                self.env._(
+                    "Estado: %(value)s",
+                    value=self._format_kardex_value(
+                        beneficiary,
+                        "state",
+                    ),
+                ),
+            ]
+        )
+
+        self._log_kardex_event(
+            beneficiary,
+            "beneficiary_created",
+            self.env._(
+                "Beneficiario %(name)s registrado.",
+                name=beneficiary.name,
+            ),
+            new_value=new_value,
+            origin="manual",
+        )
+
+    def _log_beneficiary_update(
+        self,
+        beneficiary,
+        before_values,
+        state_changed,
+    ):
+        tracked_fields = list(self._KARDEX_TRACKED_FIELDS)
+
+        if not state_changed:
+            tracked_fields.append("block_reason")
+
+        old_value, new_value = self._build_kardex_change_values(
+            beneficiary,
+            before_values,
+            tracked_fields,
+        )
+
+        if not old_value and not new_value:
+            return
+
+        self._log_kardex_event(
+            beneficiary,
+            "beneficiary_updated",
+            self.env._(
+                "Datos del beneficiario %(name)s actualizados.",
+                name=beneficiary.name,
+            ),
+            old_value=old_value,
+            new_value=new_value,
+            origin="manual",
+        )
+
+    def _log_beneficiary_state_change(
+        self,
+        beneficiary,
+        before_values,
+        change_data,
+    ):
+        old_state = change_data["old_state"]
+        new_state = beneficiary.state
+
+        if old_state == new_state:
+            return
+
+        if new_state == "blocked":
+            automatic_age_block = change_data["automatic_age_block"]
+
+            event_type = (
+                "beneficiary_age_blocked"
+                if automatic_age_block
+                else "beneficiary_blocked"
+            )
+
+            description = (
+                self.env._(
+                    "Beneficiario %(name)s bloqueado "
+                    "automáticamente por límite de edad.",
+                    name=beneficiary.name,
+                )
+                if automatic_age_block
+                else self.env._(
+                    "Beneficiario %(name)s bloqueado.",
+                    name=beneficiary.name,
+                )
+            )
+
+            self._log_kardex_event(
+                beneficiary,
+                event_type,
+                description,
+                old_value=before_values["state"],
+                new_value=self._format_kardex_value(
+                    beneficiary,
+                    "state",
+                ),
+                reason=beneficiary.block_reason,
+                origin=("automatic" if automatic_age_block else "manual"),
+            )
+            return
+
+        if new_state == "active":
+            previous_reason = before_values["block_reason"]
+
+            self._log_kardex_event(
+                beneficiary,
+                "beneficiary_reactivated",
+                self.env._(
+                    "Beneficiario %(name)s reactivado.",
+                    name=beneficiary.name,
+                ),
+                old_value=before_values["state"],
+                new_value=self._format_kardex_value(
+                    beneficiary,
+                    "state",
+                ),
+                reason=(
+                    self.env._(
+                        "Bloqueo anterior: %(reason)s",
+                        reason=previous_reason,
+                    )
+                    if previous_reason != self.env._("Sin valor")
+                    else False
+                ),
+                origin="manual",
+            )
+
+    def _log_beneficiary_write_changes(
+        self,
+        beneficiary,
+        before_values,
+        change_data,
+    ):
+        state_changed = change_data["old_state"] != beneficiary.state
+
+        self._log_beneficiary_update(
+            beneficiary,
+            before_values,
+            state_changed,
+        )
+
+        self._log_beneficiary_state_change(
+            beneficiary,
+            before_values,
+            change_data,
+        )
+
     @api.model_create_multi
     def create(self, vals_list):
         prepared_vals_list = [
             self._prepare_age_block_values(vals) for vals in vals_list
         ]
 
-        return super().create(prepared_vals_list)
+        beneficiaries = super().create(prepared_vals_list)
+
+        for beneficiary in beneficiaries:
+            self._log_beneficiary_created(beneficiary)
+
+        return beneficiaries
 
     def write(self, vals):
+        conversion_write = self.env.context.get("club_beneficiary_conversion_write")
+
+        automatic_age_context = self.env.context.get(
+            "club_beneficiary_automatic_age_block"
+        )
+
         for beneficiary in self:
+            if beneficiary.converted_member_id and not conversion_write:
+                raise ValidationError(
+                    self.env._(
+                        "Este beneficiario ya fue convertido en socio "
+                        "y su registro histórico no puede modificarse."
+                    )
+                )
+
             if beneficiary.converted_member_id and vals.get("state") == "active":
                 raise ValidationError(
                     self.env._(
@@ -300,12 +575,40 @@ class ClubBeneficiary(models.Model):
                     )
                 )
 
+            before_values = self._get_kardex_snapshot(beneficiary)
+
+            old_state = beneficiary.state
+
+            automatic_age_block = bool(
+                automatic_age_context
+                or (
+                    old_state != "blocked"
+                    and vals.get("state") != "blocked"
+                    and self._is_age_limit_reached(
+                        vals,
+                        beneficiary=beneficiary,
+                    )
+                )
+            )
+
             prepared_vals = self._prepare_age_block_values(
                 vals,
                 beneficiary=beneficiary,
             )
 
             super(ClubBeneficiary, beneficiary).write(prepared_vals)
+
+            if conversion_write:
+                continue
+
+            self._log_beneficiary_write_changes(
+                beneficiary,
+                before_values,
+                {
+                    "old_state": old_state,
+                    "automatic_age_block": automatic_age_block,
+                },
+            )
 
         return True
 
@@ -316,6 +619,8 @@ class ClubBeneficiary(models.Model):
             raise ValidationError(
                 self.env._("Este beneficiario ya fue convertido en socio.")
             )
+
+        original_member = self.member_id
 
         member = (
             self.env["res.partner"]
@@ -332,13 +637,33 @@ class ClubBeneficiary(models.Model):
             )
         )
 
-        self.write(
+        self.with_context(club_beneficiary_conversion_write=True).write(
             {
                 "state": "blocked",
                 "block_reason": self.env._("Convertido en socio"),
                 "converted_member_id": member.id,
                 "converted_at": fields.Datetime.now(),
             }
+        )
+
+        self._log_kardex_event(
+            self,
+            "beneficiary_converted",
+            self.env._(
+                "Beneficiario %(name)s convertido en socio.",
+                name=self.name,
+            ),
+            old_value=self.env._(
+                "Beneficiario de %(member)s",
+                member=original_member.display_name,
+            ),
+            new_value=self.env._(
+                "Socio %(member)s · Código %(code)s",
+                member=member.display_name,
+                code=member.club_member_code,
+            ),
+            reason=self.env._("Convertido en socio"),
+            origin="manual",
         )
 
         return {
@@ -375,7 +700,9 @@ class ClubBeneficiary(models.Model):
 
         for beneficiary in beneficiaries:
             if beneficiary.age >= 25:
-                beneficiary.write(
+                beneficiary.with_context(
+                    club_beneficiary_automatic_age_block=True
+                ).write(
                     {
                         "state": "blocked",
                         "block_reason": self.env._("Límite de edad alcanzado"),
