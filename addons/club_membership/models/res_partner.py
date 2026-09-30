@@ -433,7 +433,14 @@ class ResPartner(models.Model):
     ):
         vals = dict(original_vals)
 
-        if vals.get("club_person_type") != "member":
+        person_type = vals.get("club_person_type") or self.env.context.get(
+            "default_club_person_type"
+        )
+
+        if person_type:
+            vals["club_person_type"] = person_type
+
+        if person_type != "member":
             vals["club_member_code"] = False
             return vals
 
