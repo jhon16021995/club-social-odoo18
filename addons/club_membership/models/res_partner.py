@@ -5,6 +5,14 @@ from odoo.exceptions import ValidationError
 class ResPartner(models.Model):
     _inherit = "res.partner"
 
+    _sql_constraints = [
+        (
+            "club_id_number_unique",
+            "unique(club_id_number)",
+            "El número de carnet / identificación debe ser único en el Club.",
+        ),
+    ]
+
     _CLUB_KARDEX_PERSONAL_FIELDS = (
         "name",
         "company_type",
@@ -123,6 +131,13 @@ class ResPartner(models.Model):
         copy=False,
     )
 
+    club_beneficiary_link_ids = fields.One2many(
+        comodel_name="club.beneficiary",
+        inverse_name="person_id",
+        string="Historial como Beneficiario",
+        copy=False,
+    )
+
     club_origin_beneficiary_ids = fields.One2many(
         comodel_name="club.beneficiary",
         inverse_name="converted_member_id",
@@ -179,23 +194,38 @@ class ResPartner(models.Model):
                 - ((today.month, today.day) < (join_date.month, join_date.day))
             )
 
+    @api.model
+    def check_club_id_number_format(self, id_number):
+        if not id_number:
+            return
+
+        if not id_number.isascii() or not id_number.isdigit():
+            raise ValidationError(
+                self.env._("El número de carnet debe contener únicamente números.")
+            )
+
+        if id_number.startswith("0"):
+            raise ValidationError(
+                self.env._("El número de carnet no puede comenzar con cero.")
+            )
+
     @api.constrains(
         "club_person_type",
         "club_id_number",
-        "club_id_extension",
         "club_birthdate",
         "is_company",
     )
     def _check_club_personal_data(self):
-        Beneficiary = self.env["club.beneficiary"]
         today = fields.Date.context_today(self)
 
-        conversion_beneficiary_id = self.env.context.get(
-            "club_conversion_beneficiary_id"
-        )
-
         for partner in self:
-            if partner.club_person_type not in ("member", "client"):
+            if partner.club_id_number:
+                self.check_club_id_number_format(partner.club_id_number)
+
+            if partner.club_person_type not in (
+                "member",
+                "client",
+            ):
                 continue
 
             if not partner.club_id_number:
@@ -205,98 +235,74 @@ class ResPartner(models.Model):
                     )
                 )
 
-            if not partner.club_id_number.isascii() or not (
-                partner.club_id_number.isdigit()
-            ):
-                raise ValidationError(
-                    self.env._("El número de carnet debe contener únicamente números.")
-                )
-
             if not partner.is_company:
                 if not partner.club_birthdate:
                     raise ValidationError(
                         self.env._(
-                            "La fecha de nacimiento es obligatoria para socios "
-                            "y clientes que sean personas individuales."
+                            "La fecha de nacimiento es obligatoria "
+                            "para socios y clientes que sean "
+                            "personas individuales."
                         )
                     )
 
                 if partner.club_birthdate > today:
                     raise ValidationError(
                         self.env._(
-                            "La fecha de nacimiento no puede ser posterior "
-                            "a la fecha actual."
+                            "La fecha de nacimiento no puede ser "
+                            "posterior a la fecha actual."
                         )
                     )
 
-            duplicate = self.search(
-                [
-                    ("id", "!=", partner.id),
-                    ("club_person_type", "in", ("member", "client")),
-                    ("club_id_number", "=", partner.club_id_number),
-                    (
-                        "club_id_extension",
-                        "=",
-                        partner.club_id_extension or False,
-                    ),
-                ],
+    @api.constrains(
+        "club_person_type",
+        "club_member_state",
+    )
+    def _check_club_beneficiary_role_compatibility(self):
+        conversion_beneficiary_id = self.env.context.get(
+            "club_conversion_beneficiary_id"
+        )
+
+        for partner in self:
+            domain = [
+                ("person_id", "=", partner.id),
+                ("state", "in", ("active", "blocked")),
+            ]
+
+            if conversion_beneficiary_id:
+                domain.append(("id", "!=", conversion_beneficiary_id))
+
+            current_link = self.env["club.beneficiary"].search(
+                domain,
                 limit=1,
             )
 
-            if duplicate:
-                raise ValidationError(
-                    self.env._("Ya existe una persona con el mismo carnet y extensión.")
-                )
+            if not current_link:
+                continue
 
-            duplicate_beneficiary = Beneficiary.search(
-                [
-                    (
-                        "id_number",
-                        "=",
-                        partner.club_id_number,
-                    ),
-                    (
-                        "id_extension",
-                        "=",
-                        partner.club_id_extension or False,
-                    ),
-                ],
-                limit=1,
-            )
-
-            if (
-                duplicate_beneficiary
-                and duplicate_beneficiary.id != conversion_beneficiary_id
-                and duplicate_beneficiary.converted_member_id != partner
-            ):
+            if partner.club_person_type == "client":
                 raise ValidationError(
                     self.env._(
-                        "Ya existe un beneficiario con el mismo carnet y extensión."
+                        "Una persona con un vínculo vigente como "
+                        "Beneficiario no puede ser Cliente."
                     )
                 )
 
-    def _build_club_member_code(
-        self,
-        id_number,
-        id_extension,
-        exclude_partner=None,
-    ):
+            if (
+                partner.club_person_type == "member"
+                and partner.club_member_state != "inactive"
+            ):
+                raise ValidationError(
+                    self.env._(
+                        "Un Socio con un vínculo vigente como "
+                        "Beneficiario debe permanecer Pasivo. "
+                        "Finalice primero el vínculo de Beneficiario "
+                        "antes de reactivar al Socio."
+                    )
+                )
+
+    def _build_club_member_code(self, id_number):
         if not id_number:
             return False
-
-        domain = [
-            ("club_person_type", "=", "member"),
-            ("club_id_number", "=", id_number),
-        ]
-
-        if exclude_partner:
-            domain.append(("id", "!=", exclude_partner.id))
-
-        same_number_exists = bool(self.search(domain, limit=1))
-
-        if same_number_exists:
-            suffix = id_extension or "SINEXT"
-            return f"{id_number}-{suffix}"
 
         return id_number
 
@@ -318,15 +324,21 @@ class ResPartner(models.Model):
         if self.search(domain, limit=1):
             raise ValidationError(
                 self.env._(
-                    "No se puede usar el código de asociado %(code)s porque "
-                    "ya pertenece a otro socio.",
+                    "No se puede usar el código de asociado "
+                    "%(code)s porque ya pertenece a otro socio.",
                     code=member_code,
                 )
             )
 
-    def _apply_club_member_defaults(self, vals, partner=None):
+    def _apply_club_member_defaults(
+        self,
+        vals,
+        partner=None,
+    ):
         join_date = partner.club_join_date if partner else False
+
         member_state = partner.club_member_state if partner else False
+
         legal_state = partner.club_legal_state if partner else False
 
         if not vals.get("club_join_date") and not join_date:
@@ -338,41 +350,11 @@ class ResPartner(models.Model):
         if not vals.get("club_legal_state") and not legal_state:
             vals["club_legal_state"] = "regular"
 
-    def _get_club_member_code_for_write(
+    def _prepare_club_member_write_vals(
         self,
         partner,
         vals,
-        new_id_number,
-        new_id_extension,
     ):
-        becoming_member = partner.club_person_type != "member"
-
-        number_changed = (
-            "club_id_number" in vals and new_id_number != partner.club_id_number
-        )
-
-        if becoming_member or number_changed:
-            return self._build_club_member_code(
-                new_id_number,
-                new_id_extension,
-                exclude_partner=partner,
-            )
-
-        extension_changed = (
-            "club_id_extension" in vals
-            and new_id_extension != partner.club_id_extension
-        )
-
-        if not extension_changed:
-            return partner.club_member_code
-
-        if partner.club_member_code == partner.club_id_number:
-            return new_id_number
-
-        suffix = new_id_extension or "SINEXT"
-        return f"{new_id_number}-{suffix}"
-
-    def _prepare_club_member_write_vals(self, partner, vals):
         partner_vals = dict(vals)
 
         new_person_type = partner_vals.get(
@@ -383,9 +365,10 @@ class ResPartner(models.Model):
         if partner.club_person_type == "member" and new_person_type != "member":
             raise ValidationError(
                 self.env._(
-                    "Un socio no puede convertirse en cliente ni dejar de ser "
-                    "socio. Si deja de pertenecer al Club, debe cambiar su "
-                    "estado del asociado a Pasivo."
+                    "Un socio no puede convertirse en cliente "
+                    "ni dejar de ser socio. Si deja de pertenecer "
+                    "al Club, debe cambiar su estado del asociado "
+                    "a Pasivo."
                 )
             )
 
@@ -404,17 +387,7 @@ class ResPartner(models.Model):
             partner.club_id_number,
         )
 
-        new_id_extension = partner_vals.get(
-            "club_id_extension",
-            partner.club_id_extension,
-        )
-
-        member_code = self._get_club_member_code_for_write(
-            partner,
-            partner_vals,
-            new_id_number,
-            new_id_extension,
-        )
+        member_code = self._build_club_member_code(new_id_number)
 
         self._check_club_member_code_available(
             member_code,
@@ -428,7 +401,6 @@ class ResPartner(models.Model):
     def _prepare_club_member_create_vals(
         self,
         original_vals,
-        batch_member_numbers,
         batch_member_codes,
     ):
         vals = dict(original_vals)
@@ -447,30 +419,19 @@ class ResPartner(models.Model):
         self._apply_club_member_defaults(vals)
 
         id_number = vals.get("club_id_number")
-        id_extension = vals.get("club_id_extension")
 
         if not id_number:
             return vals
 
-        existing_member = self.search(
-            [
-                ("club_person_type", "=", "member"),
-                ("club_id_number", "=", id_number),
-            ],
-            limit=1,
-        )
-
-        same_number_exists = bool(existing_member) or id_number in batch_member_numbers
-
-        if same_number_exists:
-            suffix = id_extension or "SINEXT"
-            member_code = f"{id_number}-{suffix}"
-        else:
-            member_code = id_number
+        member_code = self._build_club_member_code(id_number)
 
         code_exists = self.search(
             [
-                ("club_member_code", "=", member_code),
+                (
+                    "club_member_code",
+                    "=",
+                    member_code,
+                ),
             ],
             limit=1,
         )
@@ -478,20 +439,23 @@ class ResPartner(models.Model):
         if code_exists or member_code in batch_member_codes:
             raise ValidationError(
                 self.env._(
-                    "No se puede generar el código de asociado porque "
-                    "ya existe otro socio con el código %(code)s.",
+                    "No se puede generar el código de asociado "
+                    "porque ya existe otro socio con el código "
+                    "%(code)s.",
                     code=member_code,
                 )
             )
 
         vals["club_member_code"] = member_code
-
-        batch_member_numbers.add(id_number)
         batch_member_codes.add(member_code)
 
         return vals
 
-    def _format_club_kardex_value(self, partner, field_name):
+    def _format_club_kardex_value(
+        self,
+        partner,
+        field_name,
+    ):
         field = partner._fields[field_name]
         value = partner[field_name]
 
@@ -504,16 +468,27 @@ class ResPartner(models.Model):
         if field.type == "selection":
             field_description = partner.fields_get([field_name])[field_name]
 
-            selection = dict(field_description.get("selection", []))
+            selection = dict(
+                field_description.get(
+                    "selection",
+                    [],
+                )
+            )
 
-            return selection.get(value, value)
+            return selection.get(
+                value,
+                value,
+            )
 
         if field.type == "date":
             return fields.Date.to_string(value)
 
         return str(value)
 
-    def _get_club_kardex_snapshot(self, partner):
+    def _get_club_kardex_snapshot(
+        self,
+        partner,
+    ):
         field_names = (
             *self._CLUB_KARDEX_PERSONAL_FIELDS,
             *self._CLUB_KARDEX_IDENTITY_FIELDS,
@@ -540,6 +515,7 @@ class ResPartner(models.Model):
 
         for field_name in field_names:
             old_value = before_values[field_name]
+
             new_value = self._format_club_kardex_value(
                 partner,
                 field_name,
@@ -551,9 +527,13 @@ class ResPartner(models.Model):
             field_label = partner._fields[field_name].string
 
             old_lines.append(f"{field_label}: {old_value}")
+
             new_lines.append(f"{field_label}: {new_value}")
 
-        return "\n".join(old_lines), "\n".join(new_lines)
+        return (
+            "\n".join(old_lines),
+            "\n".join(new_lines),
+        )
 
     def _log_club_kardex_event(
         self,
@@ -571,7 +551,10 @@ class ResPartner(models.Model):
             **event_data,
         )
 
-    def _log_club_member_created(self, partner):
+    def _log_club_member_created(
+        self,
+        partner,
+    ):
         conversion_beneficiary_id = self.env.context.get(
             "club_conversion_beneficiary_id"
         )
@@ -587,7 +570,7 @@ class ResPartner(models.Model):
                     "member_created_from_beneficiary",
                     self.env._(
                         "Alta como socio proveniente de beneficiario de %(member)s.",
-                        member=beneficiary.member_id.display_name,
+                        member=(beneficiary.member_id.display_name),
                     ),
                     new_value=self.env._(
                         "Código de asociado: %(code)s",
@@ -655,6 +638,7 @@ class ResPartner(models.Model):
             )
 
         old_code = before_values["club_member_code"]
+
         new_code = self._format_club_kardex_value(
             partner,
             "club_member_code",
@@ -671,6 +655,7 @@ class ResPartner(models.Model):
             )
 
         old_join_date = before_values["club_join_date"]
+
         new_join_date = self._format_club_kardex_value(
             partner,
             "club_join_date",
@@ -688,13 +673,11 @@ class ResPartner(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        batch_member_numbers = set()
         batch_member_codes = set()
 
         prepared_vals_list = [
             self._prepare_club_member_create_vals(
                 original_vals,
-                batch_member_numbers,
                 batch_member_codes,
             )
             for original_vals in vals_list
@@ -710,7 +693,10 @@ class ResPartner(models.Model):
 
     def write(self, vals):
         vals = dict(vals)
-        vals.pop("club_member_code", None)
+        vals.pop(
+            "club_member_code",
+            None,
+        )
 
         if not vals:
             return True
@@ -718,7 +704,6 @@ class ResPartner(models.Model):
         code_fields = {
             "club_person_type",
             "club_id_number",
-            "club_id_extension",
         }
 
         tracked_fields = {
@@ -752,7 +737,10 @@ class ResPartner(models.Model):
                     vals,
                 )
 
-            super(ResPartner, partner).write(partner_vals)
+            super(
+                ResPartner,
+                partner,
+            ).write(partner_vals)
 
             if before_values:
                 self._log_club_member_write_changes(

@@ -70,6 +70,14 @@ class ClubKardexEvent(models.Model):
                 "Modificación de beneficiario",
             ),
             (
+                "beneficiary_finalized",
+                "Finalización de vínculo de beneficiario",
+            ),
+            (
+                "beneficiary_reassigned",
+                "Reasignación de beneficiario",
+            ),
+            (
                 "beneficiary_blocked",
                 "Bloqueo de beneficiario",
             ),
@@ -159,8 +167,8 @@ class ClubKardexEvent(models.Model):
         if not self.env.context.get("club_kardex_internal_create"):
             raise AccessError(
                 self.env._(
-                    "Los eventos del Kardex solo pueden ser creados "
-                    "por procesos autorizados del sistema."
+                    "Los eventos del Kardex solo pueden ser "
+                    "creados por procesos autorizados del sistema."
                 )
             )
 
@@ -195,14 +203,21 @@ class ClubKardexEvent(models.Model):
                 self.env._("Todo evento del Kardex debe estar vinculado a un socio.")
             )
 
-        origin = event_data.get("origin", "manual")
+        origin = event_data.get(
+            "origin",
+            "manual",
+        )
 
-        if origin not in ("manual", "automatic"):
+        if origin not in (
+            "manual",
+            "automatic",
+        ):
             raise ValidationError(
                 self.env._("El origen del evento debe ser Manual o Automático.")
             )
 
         beneficiary = event_data.get("beneficiary")
+
         certificate = event_data.get("certificate")
 
         if certificate and certificate.member_id != member:
@@ -219,9 +234,9 @@ class ClubKardexEvent(models.Model):
             "user_id": self.env.user.id,
             "event_type": event_type,
             "description": description,
-            "old_value": event_data.get("old_value") or False,
-            "new_value": event_data.get("new_value") or False,
-            "reason": event_data.get("reason") or False,
+            "old_value": (event_data.get("old_value") or False),
+            "new_value": (event_data.get("new_value") or False),
+            "reason": (event_data.get("reason") or False),
             "beneficiary_id": (beneficiary.id if beneficiary else False),
             "certificate_id": (certificate.id if certificate else False),
             "origin": origin,

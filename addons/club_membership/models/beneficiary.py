@@ -4,20 +4,34 @@ from odoo.exceptions import ValidationError
 
 class ClubBeneficiary(models.Model):
     _name = "club.beneficiary"
-    _description = "Beneficiario del Club"
-    _order = "member_id, name"
+    _description = "Vínculo de Beneficiario del Club"
+    _order = "member_id, person_id"
 
     _AGE_LIMITED_RELATIONSHIPS = {
         "child",
         "stepchild",
     }
 
+    _AGE_EXEMPT_SPECIAL_CONDITIONS = {
+        "legal_guardianship",
+        "health_dependent",
+    }
+
     _KARDEX_TRACKED_FIELDS = (
-        "name",
         "relationship",
-        "birthdate",
-        "id_number",
-        "id_extension",
+        "relationship_detail",
+        "special_condition",
+        "start_date",
+        "observations",
+    )
+
+    person_id = fields.Many2one(
+        comodel_name="res.partner",
+        string="Persona beneficiaria",
+        required=True,
+        ondelete="restrict",
+        index=True,
+        domain=[("is_company", "=", False)],
     )
 
     member_id = fields.Many2one(
@@ -29,10 +43,51 @@ class ClubBeneficiary(models.Model):
         domain=[("club_person_type", "=", "member")],
     )
 
+    # -------------------------------------------------------------------------
+    # Datos de la persona.
+    #
+    # Se conservan estos nombres de campo para mantener compatibilidad con
+    # vistas y búsquedas mientras la persona real vive únicamente en
+    # res.partner.
+    # -------------------------------------------------------------------------
+
     name = fields.Char(
+        related="person_id.name",
         string="Nombre completo",
-        required=True,
+        store=True,
+        readonly=True,
     )
+
+    birthdate = fields.Date(
+        related="person_id.club_birthdate",
+        string="Fecha de nacimiento",
+        store=True,
+        readonly=True,
+    )
+
+    age = fields.Integer(
+        related="person_id.club_age",
+        string="Edad",
+        readonly=True,
+    )
+
+    id_number = fields.Char(
+        related="person_id.club_id_number",
+        string="Número de carnet",
+        store=True,
+        readonly=True,
+    )
+
+    id_extension = fields.Char(
+        related="person_id.club_id_extension",
+        string="Extensión del carnet",
+        store=True,
+        readonly=True,
+    )
+
+    # -------------------------------------------------------------------------
+    # Datos propios del vínculo.
+    # -------------------------------------------------------------------------
 
     relationship = fields.Selection(
         selection=[
@@ -41,40 +96,52 @@ class ClubBeneficiary(models.Model):
             ("child", "Hijo(a)"),
             ("stepchild", "Hijastro(a)"),
             ("parent", "Padre o madre"),
-            ("legal_guardian", "Tutor legal"),
+            ("sibling", "Hermano(a)"),
+            ("worker", "Trabajador"),
+            ("other", "Otro vínculo"),
+        ],
+        string="Vínculo con el Socio",
+        required=True,
+    )
+
+    relationship_detail = fields.Char(
+        string="Detalle del vínculo",
+    )
+
+    special_condition = fields.Selection(
+        selection=[
+            ("none", "Ninguna"),
+            (
+                "legal_guardianship",
+                "Bajo tutela legal del Socio",
+            ),
             (
                 "health_dependent",
                 "Dependiente por condición de salud",
             ),
-            ("worker", "Trabajador"),
         ],
-        string="Parentesco",
+        string="Condición especial",
         required=True,
+        default="none",
     )
 
-    birthdate = fields.Date(
-        string="Fecha de nacimiento",
+    start_date = fields.Date(
+        string="Fecha de inicio",
         required=True,
+        default=fields.Date.context_today,
+        copy=False,
     )
 
-    age = fields.Integer(
-        string="Edad",
-        compute="_compute_age",
-    )
-
-    id_number = fields.Char(
-        string="Número de carnet",
-        required=True,
-    )
-
-    id_extension = fields.Char(
-        string="Extensión del carnet",
+    end_date = fields.Date(
+        string="Fecha de finalización",
+        copy=False,
     )
 
     state = fields.Selection(
         selection=[
             ("active", "Activo"),
             ("blocked", "Bloqueado"),
+            ("finalized", "Finalizado"),
         ],
         string="Estado",
         required=True,
@@ -85,6 +152,15 @@ class ClubBeneficiary(models.Model):
     block_reason = fields.Char(
         string="Motivo de bloqueo",
         copy=False,
+    )
+
+    end_reason = fields.Char(
+        string="Motivo de finalización",
+        copy=False,
+    )
+
+    observations = fields.Text(
+        string="Observaciones",
     )
 
     converted_member_id = fields.Many2one(
@@ -102,105 +178,228 @@ class ClubBeneficiary(models.Model):
         readonly=True,
     )
 
-    @api.depends("birthdate")
-    def _compute_age(self):
-        today = fields.Date.context_today(self)
-
-        for beneficiary in self:
-            if not beneficiary.birthdate:
-                beneficiary.age = 0
-                continue
-
-            birthdate = beneficiary.birthdate
-            beneficiary.age = (
-                today.year
-                - birthdate.year
-                - ((today.month, today.day) < (birthdate.month, birthdate.day))
-            )
-
     @api.model
-    def _get_age_from_birthdate(self, birthdate):
-        birthdate = fields.Date.to_date(birthdate)
+    def _get_person_from_values(self, vals, beneficiary=None):
+        person_id = vals.get("person_id")
 
-        if not birthdate:
-            return 0
+        if person_id:
+            return self.env["res.partner"].browse(person_id)
 
-        today = fields.Date.context_today(self)
+        if beneficiary:
+            return beneficiary.person_id
 
-        return (
-            today.year
-            - birthdate.year
-            - ((today.month, today.day) < (birthdate.month, birthdate.day))
-        )
+        return self.env["res.partner"]
 
     @api.model
     def _is_age_limit_reached(self, vals, beneficiary=None):
+        state = vals.get(
+            "state",
+            beneficiary.state if beneficiary else "active",
+        )
+
+        if state == "finalized":
+            return False
+
         relationship = vals.get(
             "relationship",
             beneficiary.relationship if beneficiary else False,
         )
 
-        birthdate = vals.get(
-            "birthdate",
-            beneficiary.birthdate if beneficiary else False,
+        special_condition = vals.get(
+            "special_condition",
+            beneficiary.special_condition if beneficiary else "none",
         )
 
-        return bool(
-            relationship in self._AGE_LIMITED_RELATIONSHIPS
-            and birthdate
-            and self._get_age_from_birthdate(birthdate) >= 25
+        if relationship not in self._AGE_LIMITED_RELATIONSHIPS:
+            return False
+
+        if special_condition in self._AGE_EXEMPT_SPECIAL_CONDITIONS:
+            return False
+
+        person = self._get_person_from_values(
+            vals,
+            beneficiary=beneficiary,
         )
+
+        if not person or not person.club_birthdate:
+            return False
+
+        return person.club_age >= 25
 
     @api.model
     def _prepare_age_block_values(self, vals, beneficiary=None):
         prepared_vals = dict(vals)
 
-        if self._is_age_limit_reached(
+        target_state = prepared_vals.get(
+            "state",
+            beneficiary.state if beneficiary else "active",
+        )
+
+        if target_state == "finalized":
+            return prepared_vals
+
+        age_limit_reached = self._is_age_limit_reached(
             prepared_vals,
             beneficiary=beneficiary,
-        ):
+        )
+
+        if age_limit_reached:
             prepared_vals["state"] = "blocked"
 
-            if not prepared_vals.get("block_reason"):
+            current_reason = beneficiary.block_reason if beneficiary else False
+
+            if not prepared_vals.get("block_reason") and not current_reason:
                 prepared_vals["block_reason"] = self.env._("Límite de edad alcanzado")
 
-        elif prepared_vals.get("state") == "active":
+            return prepared_vals
+
+        if (
+            beneficiary
+            and beneficiary.state == "blocked"
+            and beneficiary.block_reason == self.env._("Límite de edad alcanzado")
+        ):
+            prepared_vals["state"] = "active"
+            prepared_vals["block_reason"] = False
+            return prepared_vals
+
+        if prepared_vals.get("state") == "active":
             prepared_vals["block_reason"] = False
 
         return prepared_vals
 
     @api.constrains(
+        "person_id",
         "member_id",
         "relationship",
+        "relationship_detail",
+        "state",
     )
-    def _check_member_and_relationship(self):
+    def _check_person_member_and_relationship(self):
         for beneficiary in self:
-            if beneficiary.member_id.club_person_type != "member":
+            person = beneficiary.person_id
+            member = beneficiary.member_id
+
+            if not person:
+                continue
+
+            if person.is_company:
+                raise ValidationError(
+                    self.env._(
+                        "La persona beneficiaria debe ser una persona individual."
+                    )
+                )
+
+            if member.club_person_type != "member":
                 raise ValidationError(
                     self.env._("El titular de un beneficiario debe ser un socio.")
                 )
 
+            if person == member:
+                raise ValidationError(
+                    self.env._("Una persona no puede ser beneficiaria de sí misma.")
+                )
+
+            if beneficiary.relationship == "worker" and not member.is_company:
+                raise ValidationError(
+                    self.env._(
+                        "El vínculo Trabajador solo puede utilizarse "
+                        "cuando el Socio titular es una empresa."
+                    )
+                )
+
             if (
-                beneficiary.relationship == "worker"
-                and not beneficiary.member_id.is_company
+                beneficiary.relationship == "other"
+                and not beneficiary.relationship_detail
             ):
                 raise ValidationError(
                     self.env._(
-                        "El parentesco Trabajador solo puede utilizarse "
-                        "cuando el socio titular es una empresa."
+                        "Debe indicar el detalle cuando el vínculo "
+                        "seleccionado sea Otro vínculo."
+                    )
+                )
+
+            if beneficiary.state not in ("active", "blocked"):
+                continue
+
+            if person.club_person_type == "client":
+                raise ValidationError(
+                    self.env._(
+                        "Un Cliente no puede ser Beneficiario al mismo tiempo. "
+                        "Primero debe dejar de tener la condición de Cliente."
+                    )
+                )
+
+            if (
+                person.club_person_type == "member"
+                and person.club_member_state != "inactive"
+            ):
+                raise ValidationError(
+                    self.env._(
+                        "Un Socio vigente no puede ser Beneficiario. "
+                        "Solo un Socio Pasivo puede tener un vínculo "
+                        "vigente como Beneficiario."
                     )
                 )
 
     @api.constrains(
-        "birthdate",
-        "relationship",
+        "person_id",
         "state",
     )
-    def _check_birthdate_and_age_limit(self):
+    def _check_single_current_link(self):
+        for beneficiary in self:
+            if beneficiary.state not in ("active", "blocked"):
+                continue
+
+            duplicate = self.search(
+                [
+                    ("id", "!=", beneficiary.id),
+                    ("person_id", "=", beneficiary.person_id.id),
+                    ("state", "in", ("active", "blocked")),
+                ],
+                limit=1,
+            )
+
+            if duplicate:
+                raise ValidationError(
+                    self.env._(
+                        "Esta persona ya tiene un vínculo vigente "
+                        "como Beneficiario con otro Socio."
+                    )
+                )
+
+    @api.constrains(
+        "person_id",
+        "state",
+        "relationship",
+        "special_condition",
+    )
+    def _check_personal_data_and_age(self):
         today = fields.Date.context_today(self)
 
         for beneficiary in self:
-            if beneficiary.birthdate > today:
+            person = beneficiary.person_id
+
+            if not person:
+                continue
+
+            if not person.club_id_number:
+                raise ValidationError(
+                    self.env._(
+                        "La persona beneficiaria debe tener un número de carnet."
+                    )
+                )
+
+            person.check_club_id_number_format(person.club_id_number)
+
+            if not person.club_birthdate:
+                raise ValidationError(
+                    self.env._(
+                        "La fecha de nacimiento es obligatoria "
+                        "para una persona beneficiaria."
+                    )
+                )
+
+            if person.club_birthdate > today:
                 raise ValidationError(
                     self.env._(
                         "La fecha de nacimiento no puede ser posterior "
@@ -208,93 +407,65 @@ class ClubBeneficiary(models.Model):
                     )
                 )
 
-            if (
-                beneficiary.relationship in self._AGE_LIMITED_RELATIONSHIPS
-                and beneficiary.age >= 25
-                and beneficiary.state != "blocked"
+            if beneficiary.state == "active" and self._is_age_limit_reached(
+                {},
+                beneficiary=beneficiary,
             ):
                 raise ValidationError(
                     self.env._(
-                        "Los hijos e hijastros de 25 años o más deben estar bloqueados."
+                        "Los hijos e hijastros de 25 años o más deben "
+                        "estar bloqueados, salvo que tengan una condición "
+                        "especial vigente."
                     )
                 )
 
     @api.constrains(
-        "id_number",
-        "id_extension",
-        "converted_member_id",
-    )
-    def _check_identity(self):
-        Partner = self.env["res.partner"]
-
-        for beneficiary in self:
-            if not beneficiary.id_number.isascii() or not (
-                beneficiary.id_number.isdigit()
-            ):
-                raise ValidationError(
-                    self.env._("El número de carnet debe contener únicamente números.")
-                )
-
-            duplicate_beneficiary = self.search(
-                [
-                    ("id", "!=", beneficiary.id),
-                    ("id_number", "=", beneficiary.id_number),
-                    (
-                        "id_extension",
-                        "=",
-                        beneficiary.id_extension or False,
-                    ),
-                ],
-                limit=1,
-            )
-
-            if duplicate_beneficiary:
-                raise ValidationError(
-                    self.env._(
-                        "Ya existe un beneficiario con el mismo carnet y extensión."
-                    )
-                )
-
-            duplicate_partner = Partner.search(
-                [
-                    (
-                        "club_person_type",
-                        "in",
-                        ("member", "client"),
-                    ),
-                    (
-                        "club_id_number",
-                        "=",
-                        beneficiary.id_number,
-                    ),
-                    (
-                        "club_id_extension",
-                        "=",
-                        beneficiary.id_extension or False,
-                    ),
-                ],
-                limit=1,
-            )
-
-            if (
-                duplicate_partner
-                and duplicate_partner != beneficiary.converted_member_id
-            ):
-                raise ValidationError(
-                    self.env._(
-                        "Ya existe un socio o cliente con el mismo carnet y extensión."
-                    )
-                )
-
-    @api.constrains(
+        "start_date",
+        "end_date",
         "state",
         "block_reason",
+        "end_reason",
     )
-    def _check_block_reason(self):
+    def _check_dates_and_reasons(self):
         for beneficiary in self:
+            if (
+                beneficiary.start_date
+                and beneficiary.end_date
+                and beneficiary.end_date < beneficiary.start_date
+            ):
+                raise ValidationError(
+                    self.env._(
+                        "La fecha de finalización no puede ser anterior "
+                        "a la fecha de inicio."
+                    )
+                )
+
             if beneficiary.state == "blocked" and not beneficiary.block_reason:
                 raise ValidationError(
-                    self.env._("Debe indicar el motivo de bloqueo del beneficiario.")
+                    self.env._("Debe indicar el motivo de bloqueo del Beneficiario.")
+                )
+
+            if beneficiary.state == "finalized":
+                if not beneficiary.end_date:
+                    raise ValidationError(
+                        self.env._(
+                            "Un vínculo finalizado debe tener fecha de finalización."
+                        )
+                    )
+
+                if not beneficiary.end_reason:
+                    raise ValidationError(
+                        self.env._(
+                            "Un vínculo finalizado debe tener motivo de finalización."
+                        )
+                    )
+
+            elif beneficiary.end_date or beneficiary.end_reason:
+                raise ValidationError(
+                    self.env._(
+                        "La fecha y el motivo de finalización solo pueden "
+                        "informarse cuando el vínculo esté Finalizado."
+                    )
                 )
 
     def _format_kardex_value(self, beneficiary, field_name):
@@ -324,6 +495,8 @@ class ClubBeneficiary(models.Model):
             *self._KARDEX_TRACKED_FIELDS,
             "state",
             "block_reason",
+            "end_date",
+            "end_reason",
         )
 
         return {
@@ -345,6 +518,7 @@ class ClubBeneficiary(models.Model):
 
         for field_name in field_names:
             old_value = before_values[field_name]
+
             new_value = self._format_kardex_value(
                 beneficiary,
                 field_name,
@@ -356,6 +530,7 @@ class ClubBeneficiary(models.Model):
             field_label = beneficiary._fields[field_name].string
 
             old_lines.append(f"{field_label}: {old_value}")
+
             new_lines.append(f"{field_label}: {new_value}")
 
         return "\n".join(old_lines), "\n".join(new_lines)
@@ -381,15 +556,26 @@ class ClubBeneficiary(models.Model):
         new_value = "\n".join(
             [
                 self.env._(
-                    "Parentesco: %(value)s",
+                    "Persona: %(value)s",
+                    value=beneficiary.person_id.display_name,
+                ),
+                self.env._(
+                    "Carnet: %(value)s",
+                    value=beneficiary.id_number,
+                ),
+                self.env._(
+                    "Vínculo: %(value)s",
                     value=self._format_kardex_value(
                         beneficiary,
                         "relationship",
                     ),
                 ),
                 self.env._(
-                    "Carnet: %(value)s",
-                    value=beneficiary.id_number,
+                    "Condición especial: %(value)s",
+                    value=self._format_kardex_value(
+                        beneficiary,
+                        "special_condition",
+                    ),
                 ),
                 self.env._(
                     "Estado: %(value)s",
@@ -423,6 +609,13 @@ class ClubBeneficiary(models.Model):
         if not state_changed:
             tracked_fields.append("block_reason")
 
+        tracked_fields.extend(
+            [
+                "end_date",
+                "end_reason",
+            ]
+        )
+
         old_value, new_value = self._build_kardex_change_values(
             beneficiary,
             before_values,
@@ -436,7 +629,7 @@ class ClubBeneficiary(models.Model):
             beneficiary,
             "beneficiary_updated",
             self.env._(
-                "Datos del beneficiario %(name)s actualizados.",
+                "Datos del vínculo del Beneficiario %(name)s actualizados.",
                 name=beneficiary.name,
             ),
             old_value=old_value,
@@ -515,6 +708,28 @@ class ClubBeneficiary(models.Model):
                     if previous_reason != self.env._("Sin valor")
                     else False
                 ),
+                origin=(
+                    "automatic"
+                    if change_data["automatic_age_reactivation"]
+                    else "manual"
+                ),
+            )
+            return
+
+        if new_state == "finalized":
+            self._log_kardex_event(
+                beneficiary,
+                "beneficiary_updated",
+                self.env._(
+                    "Vínculo del Beneficiario %(name)s finalizado.",
+                    name=beneficiary.name,
+                ),
+                old_value=before_values["state"],
+                new_value=self._format_kardex_value(
+                    beneficiary,
+                    "state",
+                ),
+                reason=beneficiary.end_reason,
                 origin="manual",
             )
 
@@ -559,44 +774,64 @@ class ClubBeneficiary(models.Model):
         )
 
         for beneficiary in self:
-            if beneficiary.converted_member_id and not conversion_write:
+            if beneficiary.state == "finalized" and not conversion_write:
                 raise ValidationError(
                     self.env._(
-                        "Este beneficiario ya fue convertido en socio "
-                        "y su registro histórico no puede modificarse."
+                        "Un vínculo de Beneficiario finalizado es "
+                        "histórico y no puede modificarse."
                     )
                 )
 
-            if beneficiary.converted_member_id and vals.get("state") == "active":
+            if ("person_id" in vals or "member_id" in vals) and not conversion_write:
                 raise ValidationError(
                     self.env._(
-                        "Un beneficiario convertido en socio no puede "
-                        "reactivarse como beneficiario."
+                        "La persona y el Socio titular no pueden "
+                        "reemplazarse directamente. Debe finalizarse "
+                        "el vínculo actual y crear uno nuevo."
                     )
                 )
 
             before_values = self._get_kardex_snapshot(beneficiary)
 
             old_state = beneficiary.state
-
-            automatic_age_block = bool(
-                automatic_age_context
-                or (
-                    old_state != "blocked"
-                    and vals.get("state") != "blocked"
-                    and self._is_age_limit_reached(
-                        vals,
-                        beneficiary=beneficiary,
-                    )
-                )
-            )
+            old_reason = beneficiary.block_reason
 
             prepared_vals = self._prepare_age_block_values(
                 vals,
                 beneficiary=beneficiary,
             )
 
-            super(ClubBeneficiary, beneficiary).write(prepared_vals)
+            automatic_age_block = bool(
+                automatic_age_context
+                or (
+                    old_state != "blocked"
+                    and prepared_vals.get(
+                        "state",
+                        old_state,
+                    )
+                    == "blocked"
+                    and prepared_vals.get(
+                        "block_reason",
+                        old_reason,
+                    )
+                    == self.env._("Límite de edad alcanzado")
+                )
+            )
+
+            automatic_age_reactivation = bool(
+                old_state == "blocked"
+                and old_reason == self.env._("Límite de edad alcanzado")
+                and prepared_vals.get(
+                    "state",
+                    old_state,
+                )
+                == "active"
+            )
+
+            super(
+                ClubBeneficiary,
+                beneficiary,
+            ).write(prepared_vals)
 
             if conversion_write:
                 continue
@@ -606,7 +841,8 @@ class ClubBeneficiary(models.Model):
                 before_values,
                 {
                     "old_state": old_state,
-                    "automatic_age_block": automatic_age_block,
+                    "automatic_age_block": (automatic_age_block),
+                    "automatic_age_reactivation": (automatic_age_reactivation),
                 },
             )
 
@@ -615,33 +851,45 @@ class ClubBeneficiary(models.Model):
     def action_convert_to_member(self):
         self.ensure_one()
 
-        if self.converted_member_id:
+        if self.state == "finalized":
             raise ValidationError(
-                self.env._("Este beneficiario ya fue convertido en socio.")
+                self.env._("Este vínculo de Beneficiario ya está finalizado.")
+            )
+
+        person = self.person_id
+
+        if person.club_person_type == "client":
+            raise ValidationError(
+                self.env._(
+                    "Esta persona todavía tiene la condición de Cliente. "
+                    "Debe finalizar primero esa condición antes de "
+                    "convertirse en Socio."
+                )
+            )
+
+        if person.club_person_type == "member":
+            raise ValidationError(
+                self.env._(
+                    "Esta persona ya posee historial como Socio. "
+                    "La reactivación de un Socio Pasivo se realizará "
+                    "mediante el proceso específico de reactivación."
+                )
             )
 
         original_member = self.member_id
 
-        member = (
-            self.env["res.partner"]
-            .with_context(club_conversion_beneficiary_id=self.id)
-            .create(
-                {
-                    "name": self.name,
-                    "club_person_type": "member",
-                    "club_id_number": self.id_number,
-                    "club_id_extension": self.id_extension,
-                    "club_birthdate": self.birthdate,
-                    "is_company": False,
-                }
-            )
+        person.with_context(club_conversion_beneficiary_id=self.id).write(
+            {
+                "club_person_type": "member",
+            }
         )
 
         self.with_context(club_beneficiary_conversion_write=True).write(
             {
-                "state": "blocked",
-                "block_reason": self.env._("Convertido en socio"),
-                "converted_member_id": member.id,
+                "state": "finalized",
+                "end_date": fields.Date.context_today(self),
+                "end_reason": self.env._("Conversión a Socio"),
+                "converted_member_id": person.id,
                 "converted_at": fields.Datetime.now(),
             }
         )
@@ -650,7 +898,7 @@ class ClubBeneficiary(models.Model):
             self,
             "beneficiary_converted",
             self.env._(
-                "Beneficiario %(name)s convertido en socio.",
+                "Beneficiario %(name)s convertido en Socio.",
                 name=self.name,
             ),
             old_value=self.env._(
@@ -659,10 +907,10 @@ class ClubBeneficiary(models.Model):
             ),
             new_value=self.env._(
                 "Socio %(member)s · Código %(code)s",
-                member=member.display_name,
-                code=member.club_member_code,
+                member=person.display_name,
+                code=person.club_member_code,
             ),
-            reason=self.env._("Convertido en socio"),
+            reason=self.env._("Conversión a Socio"),
             origin="manual",
         )
 
@@ -670,7 +918,7 @@ class ClubBeneficiary(models.Model):
             "type": "ir.actions.act_window",
             "name": self.env._("Socio"),
             "res_model": "res.partner",
-            "res_id": member.id,
+            "res_id": person.id,
             "view_mode": "form",
             "views": [
                 (
@@ -692,14 +940,29 @@ class ClubBeneficiary(models.Model):
                     "in",
                     tuple(self._AGE_LIMITED_RELATIONSHIPS),
                 ),
-                ("birthdate", "!=", False),
-                ("state", "=", "active"),
-                ("converted_member_id", "=", False),
+                (
+                    "special_condition",
+                    "=",
+                    "none",
+                ),
+                (
+                    "person_id.club_birthdate",
+                    "!=",
+                    False,
+                ),
+                (
+                    "state",
+                    "=",
+                    "active",
+                ),
             ]
         )
 
         for beneficiary in beneficiaries:
-            if beneficiary.age >= 25:
+            if self._is_age_limit_reached(
+                {},
+                beneficiary=beneficiary,
+            ):
                 beneficiary.with_context(
                     club_beneficiary_automatic_age_block=True
                 ).write(
@@ -708,3 +971,11 @@ class ClubBeneficiary(models.Model):
                         "block_reason": self.env._("Límite de edad alcanzado"),
                     }
                 )
+
+    @api.ondelete(at_uninstall=False)
+    def _unlink_except_module_uninstall(self):
+        raise ValidationError(
+            self.env._(
+                "Los vínculos de Beneficiario son históricos y no pueden eliminarse."
+            )
+        )

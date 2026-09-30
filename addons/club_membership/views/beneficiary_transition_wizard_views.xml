@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record
+        id="view_club_beneficiary_transition_wizard_form"
+        model="ir.ui.view"
+    >
+        <field name="name">
+            club.beneficiary.transition.wizard.form
+        </field>
+
+        <field name="model">club.beneficiary.transition.wizard</field>
+
+        <field name="arch" type="xml">
+            <form string="Gestionar vínculo de Beneficiario">
+                <field name="operation" invisible="1"/>
+
+                <group string="Vínculo actual">
+                    <field name="person_id"/>
+                    <field name="current_member_id"/>
+                    <field name="current_relationship"/>
+                </group>
+
+                <group string="Finalización">
+                    <field
+                        name="end_date"
+                        required="1"
+                    />
+
+                    <field
+                        name="reason"
+                        required="1"
+                        placeholder="Explique el motivo de la operación..."
+                    />
+                </group>
+
+                <group
+                    string="Nuevo vínculo"
+                    invisible="operation != 'reassign'"
+                >
+                    <field
+                        name="new_member_id"
+                        required="operation == 'reassign'"
+                        options="{
+                            'no_create': True,
+                            'no_open': True
+                        }"
+                    />
+
+                    <field
+                        name="relationship"
+                        required="operation == 'reassign'"
+                    />
+
+                    <field
+                        name="relationship_detail"
+                        invisible="relationship != 'other'"
+                        required="
+                            operation == 'reassign'
+                            and relationship == 'other'
+                        "
+                    />
+
+                    <field
+                        name="special_condition"
+                        required="operation == 'reassign'"
+                    />
+
+                    <field
+                        name="start_date"
+                        required="operation == 'reassign'"
+                    />
+                </group>
+
+                <footer>
+                    <button
+                        name="action_confirm"
+                        string="Finalizar vínculo"
+                        type="object"
+                        class="btn-primary"
+                        invisible="operation != 'finalize'"
+                    />
+
+                    <button
+                        name="action_confirm"
+                        string="Confirmar reasignación"
+                        type="object"
+                        class="btn-primary"
+                        invisible="operation != 'reassign'"
+                    />
+
+                    <button
+                        string="Cancelar"
+                        special="cancel"
+                        class="btn-secondary"
+                    />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Botones en la ficha general del Beneficiario. -->
+
+    <record
+        id="view_club_beneficiary_form_transition_actions"
+        model="ir.ui.view"
+    >
+        <field name="name">
+            club.beneficiary.form.transition.actions
+        </field>
+
+        <field name="model">club.beneficiary</field>
+
+        <field
+            name="inherit_id"
+            ref="view_club_beneficiary_form"
+        />
+
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button
+                    name="action_open_reassign_wizard"
+                    type="object"
+                    string="Reasignar / cambiar vínculo"
+                    invisible="state == 'finalized'"
+                />
+
+                <button
+                    name="action_open_finalize_wizard"
+                    type="object"
+                    string="Finalizar vínculo"
+                    invisible="state == 'finalized'"
+                    confirm="
+                        El vínculo actual quedará histórico.
+                        ¿Desea continuar?
+                    "
+                />
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Botones cuando el Beneficiario se abre desde la ficha del Socio. -->
+
+    <record
+        id="view_partner_form_club_beneficiary_transition_actions"
+        model="ir.ui.view"
+    >
+        <field name="name">
+            res.partner.form.club.beneficiary.transition.actions
+        </field>
+
+        <field name="model">res.partner</field>
+
+        <field
+            name="inherit_id"
+            ref="view_partner_form_club_membership"
+        />
+
+        <field name="arch" type="xml">
+            <xpath
+                expr="//field[@name='club_beneficiary_ids']/form/sheet"
+                position="before"
+            >
+                <header>
+                    <button
+                        name="action_open_reassign_wizard"
+                        type="object"
+                        string="Reasignar / cambiar vínculo"
+                        invisible="state == 'finalized'"
+                    />
+
+                    <button
+                        name="action_open_finalize_wizard"
+                        type="object"
+                        string="Finalizar vínculo"
+                        invisible="state == 'finalized'"
+                        confirm="
+                            El vínculo actual quedará histórico.
+                            ¿Desea continuar?
+                        "
+                    />
+                </header>
+            </xpath>
+        </field>
+    </record>
+</odoo>

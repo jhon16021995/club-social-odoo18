@@ -1,9 +1,103 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <!-- ============================================================
-         FORMULARIO PROPIO DEL CLUB
-         Usa res.partner, pero sin recargar la ficha con campos
-         generales de Contactos que no necesitamos aquí.
+         FORMULARIO DE IDENTIDAD PARA PERSONA BENEFICIARIA
+         Se usa desde person_id.
+         No convierte a la persona en Cliente ni en Socio.
+         ============================================================ -->
+
+    <record id="view_partner_form_club_person_identity" model="ir.ui.view">
+        <field name="name">res.partner.form.club.person.identity</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" eval="False"/>
+        <field name="arch" type="xml">
+            <form string="Persona beneficiaria" delete="false">
+                <sheet>
+                    <field name="is_company" invisible="1"/>
+                    <field name="company_type" invisible="1"/>
+
+                    <field
+                        name="image_1920"
+                        widget="image"
+                        class="oe_avatar"
+                    />
+
+                    <div class="oe_title">
+                        <label for="name" string="Nombre completo"/>
+                        <h1>
+                            <field
+                                name="name"
+                                placeholder="Nombre completo"
+                                required="1"
+                            />
+                        </h1>
+                    </div>
+
+                    <group>
+                        <group string="Identificación">
+                            <field
+                                name="club_id_number"
+                                string="Número de carnet"
+                                required="1"
+                            />
+
+                            <field
+                                name="club_id_extension"
+                                string="Extensión del carnet"
+                            />
+
+                            <field
+                                name="club_birthdate"
+                                string="Fecha de nacimiento"
+                                required="1"
+                            />
+
+                            <field
+                                name="club_age"
+                                string="Edad"
+                                readonly="1"
+                            />
+                        </group>
+
+                        <group string="Contacto">
+                            <field name="phone"/>
+                            <field name="mobile"/>
+                            <field name="email"/>
+                        </group>
+                    </group>
+
+                    <group>
+                        <group string="Datos personales">
+                            <field name="club_nationality_id"/>
+                            <field name="club_marital_status"/>
+                            <field name="club_occupation"/>
+                            <field name="club_title"/>
+                        </group>
+
+                        <group string="Dirección">
+                            <field
+                                name="street"
+                                placeholder="Calle / Avenida"
+                            />
+
+                            <field
+                                name="street2"
+                                placeholder="Zona / Referencia"
+                            />
+
+                            <field name="city"/>
+                            <field name="state_id"/>
+                            <field name="zip"/>
+                            <field name="country_id"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         FORMULARIO PRINCIPAL DEL CLUB
          ============================================================ -->
 
     <record id="view_partner_form_club_membership" model="ir.ui.view">
@@ -147,17 +241,34 @@
                                     delete="false"
                                     decoration-success="state == 'active'"
                                     decoration-danger="state == 'blocked'"
+                                    decoration-muted="state == 'finalized'"
                                 >
-                                    <field name="name"/>
-
                                     <field
-                                        name="relationship"
-                                        string="Parentesco"
+                                        name="person_id"
+                                        string="Persona"
                                     />
 
                                     <field
-                                        name="birthdate"
-                                        string="Fecha de nacimiento"
+                                        name="id_number"
+                                        string="Carnet"
+                                        readonly="1"
+                                    />
+
+                                    <field
+                                        name="id_extension"
+                                        string="Extensión"
+                                        readonly="1"
+                                    />
+
+                                    <field
+                                        name="relationship"
+                                        string="Vínculo"
+                                    />
+
+                                    <field
+                                        name="special_condition"
+                                        string="Condición especial"
+                                        optional="show"
                                     />
 
                                     <field
@@ -167,13 +278,9 @@
                                     />
 
                                     <field
-                                        name="id_number"
-                                        string="Carnet"
-                                    />
-
-                                    <field
-                                        name="id_extension"
-                                        string="Extensión"
+                                        name="start_date"
+                                        string="Inicio"
+                                        optional="show"
                                     />
 
                                     <field name="state"/>
@@ -181,17 +288,23 @@
                                     <field
                                         name="block_reason"
                                         string="Motivo de bloqueo"
-                                        optional="show"
+                                        optional="hide"
                                     />
 
                                     <field
-                                        name="converted_member_id"
-                                        string="Convertido en socio"
+                                        name="end_date"
+                                        string="Fin"
+                                        optional="hide"
+                                    />
+
+                                    <field
+                                        name="end_reason"
+                                        string="Motivo de finalización"
                                         optional="hide"
                                     />
                                 </list>
 
-                                <form string="Beneficiario">
+                                <form string="Vínculo de Beneficiario">
                                     <sheet>
                                         <field
                                             name="member_id"
@@ -203,32 +316,47 @@
                                             invisible="1"
                                         />
 
-                                        <div class="oe_title">
-                                            <label
-                                                for="name"
-                                                string="Nombre completo"
-                                            />
-                                            <h1>
-                                                <field
-                                                    name="name"
-                                                    placeholder="Nombre completo"
-                                                    readonly="converted_member_id"
-                                                />
-                                            </h1>
-                                        </div>
-
                                         <group>
-                                            <group string="Datos personales">
+                                            <group string="Persona beneficiaria">
                                                 <field
-                                                    name="relationship"
-                                                    string="Parentesco"
-                                                    readonly="converted_member_id"
+                                                    name="person_id"
+                                                    string="Persona"
+                                                    required="1"
+                                                    domain="[
+                                                        ('is_company', '=', False),
+                                                        '|',
+                                                        ('club_person_type', '=', False),
+                                                        '&amp;',
+                                                        ('club_person_type', '=', 'member'),
+                                                        ('club_member_state', '=', 'inactive')
+                                                    ]"
+                                                    context="{
+                                                        'form_view_ref': 'club_membership.view_partner_form_club_person_identity',
+                                                        'default_is_company': False,
+                                                        'default_company_type': 'person'
+                                                    }"
+                                                    options="{
+                                                        'no_quick_create': True,
+                                                        'no_open': True
+                                                    }"
+                                                />
+
+                                                <field
+                                                    name="id_number"
+                                                    string="Carnet"
+                                                    readonly="1"
+                                                />
+
+                                                <field
+                                                    name="id_extension"
+                                                    string="Extensión"
+                                                    readonly="1"
                                                 />
 
                                                 <field
                                                     name="birthdate"
                                                     string="Fecha de nacimiento"
-                                                    readonly="converted_member_id"
+                                                    readonly="1"
                                                 />
 
                                                 <field
@@ -238,43 +366,80 @@
                                                 />
                                             </group>
 
-                                            <group string="Identificación">
+                                            <group string="Vínculo con el Socio">
                                                 <field
-                                                    name="id_number"
-                                                    string="Número de carnet"
-                                                    readonly="converted_member_id"
+                                                    name="relationship"
+                                                    string="Vínculo"
+                                                    readonly="state == 'finalized'"
                                                 />
 
                                                 <field
-                                                    name="id_extension"
-                                                    string="Extensión"
-                                                    readonly="converted_member_id"
+                                                    name="relationship_detail"
+                                                    string="Detalle del vínculo"
+                                                    invisible="relationship != 'other'"
+                                                    required="relationship == 'other'"
+                                                    readonly="state == 'finalized'"
+                                                />
+
+                                                <field
+                                                    name="special_condition"
+                                                    string="Condición especial"
+                                                    readonly="state == 'finalized'"
+                                                />
+
+                                                <field
+                                                    name="start_date"
+                                                    string="Fecha de inicio"
+                                                    readonly="state == 'finalized'"
                                                 />
                                             </group>
                                         </group>
 
-                                        <group string="Control de acceso">
+                                        <group string="Estado del vínculo">
                                             <group>
                                                 <field
                                                     name="state"
-                                                    string="Estado"
-                                                    readonly="converted_member_id"
+                                                    readonly="state == 'finalized'"
                                                 />
-                                            </group>
 
-                                            <group>
                                                 <field
                                                     name="block_reason"
                                                     string="Motivo de bloqueo"
                                                     invisible="state != 'blocked'"
                                                     required="state == 'blocked'"
-                                                    readonly="converted_member_id"
+                                                />
+                                            </group>
+
+                                            <group>
+                                                <field
+                                                    name="end_date"
+                                                    string="Fecha de finalización"
+                                                    invisible="state != 'finalized'"
+                                                    required="state == 'finalized'"
+                                                    readonly="state == 'finalized' and end_date"
+                                                />
+
+                                                <field
+                                                    name="end_reason"
+                                                    string="Motivo de finalización"
+                                                    invisible="state != 'finalized'"
+                                                    required="state == 'finalized'"
+                                                    readonly="state == 'finalized' and end_reason"
                                                 />
                                             </group>
                                         </group>
 
+                                        <group string="Información adicional">
+                                            <field
+                                                name="observations"
+                                                nolabel="1"
+                                                placeholder="Observaciones administrativas del vínculo..."
+                                                readonly="state == 'finalized'"
+                                            />
+                                        </group>
+
                                         <group
-                                            string="Conversión a socio"
+                                            string="Conversión a Socio"
                                             invisible="not converted_member_id"
                                         >
                                             <group>
@@ -297,6 +462,58 @@
                                 </form>
                             </field>
                         </page>
+
+                        <page
+                            string="Historial personal como Beneficiario"
+                            name="club_beneficiary_person_history"
+                        >
+                            <field
+                                name="club_beneficiary_link_ids"
+                                readonly="1"
+                            >
+                                <list
+                                    string="Historial como Beneficiario"
+                                    create="false"
+                                    delete="false"
+                                    decoration-success="state == 'active'"
+                                    decoration-danger="state == 'blocked'"
+                                    decoration-muted="state == 'finalized'"
+                                >
+                                    <field
+                                        name="member_id"
+                                        string="Socio titular"
+                                    />
+
+                                    <field
+                                        name="relationship"
+                                        string="Vínculo"
+                                    />
+
+                                    <field
+                                        name="special_condition"
+                                        string="Condición especial"
+                                    />
+
+                                    <field
+                                        name="start_date"
+                                        string="Inicio"
+                                    />
+
+                                    <field
+                                        name="end_date"
+                                        string="Fin"
+                                    />
+
+                                    <field name="state"/>
+
+                                    <field
+                                        name="end_reason"
+                                        string="Motivo de finalización"
+                                        optional="show"
+                                    />
+                                </list>
+                            </field>
+                        </page>
                     </notebook>
                 </sheet>
             </form>
@@ -317,8 +534,12 @@
                 delete="false"
                 decoration-success="state == 'active'"
                 decoration-danger="state == 'blocked'"
+                decoration-muted="state == 'finalized'"
             >
-                <field name="name"/>
+                <field
+                    name="person_id"
+                    string="Persona"
+                />
 
                 <field
                     name="member_id"
@@ -326,23 +547,50 @@
                 />
 
                 <field
-                    name="relationship"
-                    string="Parentesco"
-                />
-
-                <field
                     name="id_number"
                     string="Carnet"
+                    readonly="1"
                 />
 
                 <field
                     name="id_extension"
                     string="Extensión"
+                    readonly="1"
+                />
+
+                <field
+                    name="relationship"
+                    string="Vínculo"
+                />
+
+                <field
+                    name="relationship_detail"
+                    string="Detalle"
+                    optional="hide"
+                />
+
+                <field
+                    name="special_condition"
+                    string="Condición especial"
+                    optional="show"
                 />
 
                 <field
                     name="age"
                     string="Edad"
+                    readonly="1"
+                />
+
+                <field
+                    name="start_date"
+                    string="Inicio"
+                    optional="show"
+                />
+
+                <field
+                    name="end_date"
+                    string="Fin"
+                    optional="hide"
                 />
 
                 <field name="state"/>
@@ -354,14 +602,14 @@
                 />
 
                 <field
-                    name="converted_member_id"
-                    string="Socio convertido"
+                    name="end_reason"
+                    string="Motivo de finalización"
                     optional="hide"
                 />
 
                 <field
-                    name="converted_at"
-                    string="Fecha de conversión"
+                    name="converted_member_id"
+                    string="Socio convertido"
                     optional="hide"
                 />
             </list>
@@ -377,7 +625,7 @@
         <field name="model">club.beneficiary</field>
         <field name="arch" type="xml">
             <form
-                string="Beneficiario"
+                string="Vínculo de Beneficiario"
                 create="false"
                 delete="false"
             >
@@ -387,7 +635,7 @@
                         type="object"
                         string="Convertir en Socio"
                         class="oe_highlight"
-                        invisible="converted_member_id"
+                        invisible="state == 'finalized'"
                     />
                 </header>
 
@@ -399,19 +647,45 @@
 
                     <div class="oe_title">
                         <label
-                            for="name"
-                            string="Nombre completo"
+                            for="person_id"
+                            string="Persona beneficiaria"
                         />
+
                         <h1>
                             <field
-                                name="name"
-                                placeholder="Nombre completo"
-                                readonly="converted_member_id"
+                                name="person_id"
+                                readonly="1"
                             />
                         </h1>
                     </div>
 
                     <group>
+                        <group string="Identificación">
+                            <field
+                                name="id_number"
+                                string="Carnet"
+                                readonly="1"
+                            />
+
+                            <field
+                                name="id_extension"
+                                string="Extensión"
+                                readonly="1"
+                            />
+
+                            <field
+                                name="birthdate"
+                                string="Fecha de nacimiento"
+                                readonly="1"
+                            />
+
+                            <field
+                                name="age"
+                                string="Edad"
+                                readonly="1"
+                            />
+                        </group>
+
                         <group string="Vínculo con el Club">
                             <field
                                 name="member_id"
@@ -421,46 +695,37 @@
 
                             <field
                                 name="relationship"
-                                string="Parentesco"
-                                readonly="converted_member_id"
-                            />
-                        </group>
-
-                        <group string="Datos personales">
-                            <field
-                                name="birthdate"
-                                string="Fecha de nacimiento"
-                                readonly="converted_member_id"
+                                string="Vínculo"
+                                readonly="state == 'finalized'"
                             />
 
                             <field
-                                name="age"
-                                string="Edad"
-                                readonly="1"
+                                name="relationship_detail"
+                                string="Detalle del vínculo"
+                                invisible="relationship != 'other'"
+                                required="relationship == 'other'"
+                                readonly="state == 'finalized'"
+                            />
+
+                            <field
+                                name="special_condition"
+                                string="Condición especial"
+                                readonly="state == 'finalized'"
+                            />
+
+                            <field
+                                name="start_date"
+                                string="Fecha de inicio"
+                                readonly="state == 'finalized'"
                             />
                         </group>
                     </group>
 
-                    <group>
-                        <group string="Identificación">
-                            <field
-                                name="id_number"
-                                string="Número de carnet"
-                                readonly="converted_member_id"
-                            />
-
-                            <field
-                                name="id_extension"
-                                string="Extensión"
-                                readonly="converted_member_id"
-                            />
-                        </group>
-
-                        <group string="Estado del beneficiario">
+                    <group string="Estado del vínculo">
+                        <group>
                             <field
                                 name="state"
-                                string="Estado"
-                                readonly="converted_member_id"
+                                readonly="state == 'finalized'"
                             />
 
                             <field
@@ -468,13 +733,38 @@
                                 string="Motivo de bloqueo"
                                 invisible="state != 'blocked'"
                                 required="state == 'blocked'"
-                                readonly="converted_member_id"
+                                readonly="state == 'finalized'"
+                            />
+                        </group>
+
+                        <group>
+                            <field
+                                name="end_date"
+                                string="Fecha de finalización"
+                                invisible="state != 'finalized'"
+                                readonly="1"
+                            />
+
+                            <field
+                                name="end_reason"
+                                string="Motivo de finalización"
+                                invisible="state != 'finalized'"
+                                readonly="1"
                             />
                         </group>
                     </group>
 
+                    <group string="Información adicional">
+                        <field
+                            name="observations"
+                            nolabel="1"
+                            placeholder="Observaciones administrativas del vínculo..."
+                            readonly="state == 'finalized'"
+                        />
+                    </group>
+
                     <group
-                        string="Conversión a socio"
+                        string="Conversión a Socio"
                         invisible="not converted_member_id"
                     >
                         <group>
@@ -520,6 +810,11 @@
                 />
 
                 <field
+                    name="person_id"
+                    string="Persona"
+                />
+
+                <field
                     name="member_id"
                     string="Socio titular"
                 />
@@ -530,13 +825,13 @@
                 />
 
                 <field
-                    name="id_extension"
-                    string="Extensión"
+                    name="relationship"
+                    string="Vínculo"
                 />
 
                 <field
-                    name="relationship"
-                    string="Parentesco"
+                    name="special_condition"
+                    string="Condición especial"
                 />
 
                 <field name="state"/>
@@ -556,6 +851,14 @@
                 />
 
                 <filter
+                    string="Finalizados"
+                    name="beneficiary_finalized"
+                    domain="[('state', '=', 'finalized')]"
+                />
+
+                <separator/>
+
+                <filter
                     string="Hijos"
                     name="beneficiary_children"
                     domain="[('relationship', '=', 'child')]"
@@ -568,13 +871,33 @@
                 />
 
                 <filter
+                    string="Hermanos"
+                    name="beneficiary_siblings"
+                    domain="[('relationship', '=', 'sibling')]"
+                />
+
+                <filter
                     string="Trabajadores"
                     name="beneficiary_workers"
                     domain="[('relationship', '=', 'worker')]"
                 />
 
+                <separator/>
+
                 <filter
-                    string="Convertidos en socio"
+                    string="Bajo tutela legal"
+                    name="beneficiary_guardianship"
+                    domain="[('special_condition', '=', 'legal_guardianship')]"
+                />
+
+                <filter
+                    string="Dependencia por salud"
+                    name="beneficiary_health_dependent"
+                    domain="[('special_condition', '=', 'health_dependent')]"
+                />
+
+                <filter
+                    string="Convertidos en Socio"
                     name="beneficiary_converted"
                     domain="[('converted_member_id', '!=', False)]"
                 />
@@ -587,9 +910,15 @@
                     />
 
                     <filter
-                        string="Parentesco"
+                        string="Vínculo"
                         name="group_beneficiary_relationship"
                         context="{'group_by': 'relationship'}"
+                    />
+
+                    <filter
+                        string="Condición especial"
+                        name="group_beneficiary_special_condition"
+                        context="{'group_by': 'special_condition'}"
                     />
 
                     <filter
@@ -883,10 +1212,12 @@
         <field name="res_model">club.beneficiary</field>
         <field name="view_mode">list,form</field>
         <field name="view_id" eval="False"/>
+
         <field
             name="search_view_id"
             ref="view_club_beneficiary_search"
         />
+
         <field name="context">
             {
                 'create': False
@@ -900,10 +1231,12 @@
     >
         <field name="sequence" eval="1"/>
         <field name="view_mode">list</field>
+
         <field
             name="view_id"
             ref="view_club_beneficiary_list"
         />
+
         <field
             name="act_window_id"
             ref="action_club_beneficiaries"
@@ -916,10 +1249,12 @@
     >
         <field name="sequence" eval="2"/>
         <field name="view_mode">form</field>
+
         <field
             name="view_id"
             ref="view_club_beneficiary_form"
         />
+
         <field
             name="act_window_id"
             ref="action_club_beneficiaries"
