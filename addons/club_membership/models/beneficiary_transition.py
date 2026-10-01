@@ -145,7 +145,6 @@ class ClubBeneficiaryTransition(models.Model):
             )
 
         new_member_id = transition_vals.get("new_member_id")
-
         relationship = transition_vals.get("relationship")
 
         special_condition = transition_vals.get(
@@ -205,13 +204,11 @@ class ClubBeneficiaryTransition(models.Model):
                 )
             )
 
-        old_member = self.member_id
-
         old_value = "\n".join(
             [
                 self.env._(
                     "Socio titular: %(value)s",
-                    value=old_member.display_name,
+                    value=self.member_id.display_name,
                 ),
                 self.env._(
                     "Vínculo: %(value)s",
@@ -235,15 +232,27 @@ class ClubBeneficiaryTransition(models.Model):
             reason,
         )
 
-        new_link = self.env["club.beneficiary"].create(
-            {
-                "person_id": self.person_id.id,
-                "member_id": new_member.id,
-                "relationship": relationship,
-                "relationship_detail": (relationship_detail),
-                "special_condition": (special_condition or "none"),
-                "start_date": start_date,
-            }
+        clean_context = {
+            key: value
+            for key, value in self.env.context.items()
+            if not key.startswith("default_")
+        }
+
+        new_link = (
+            self.env["club.beneficiary"]
+            .with_context(**clean_context)
+            .create(
+                {
+                    "person_id": self.person_id.id,
+                    "member_id": new_member.id,
+                    "relationship": relationship,
+                    "relationship_detail": relationship_detail,
+                    "special_condition": special_condition or "none",
+                    "start_date": start_date,
+                    "end_date": False,
+                    "end_reason": False,
+                }
+            )
         )
 
         new_value = "\n".join(
@@ -313,6 +322,8 @@ class ClubBeneficiaryTransition(models.Model):
                 self.env._("Un vínculo finalizado no puede reasignarse.")
             )
 
+        today = fields.Date.context_today(self)
+
         return {
             "type": "ir.actions.act_window",
             "name": self.env._("Reasignar / cambiar vínculo"),
@@ -329,7 +340,7 @@ class ClubBeneficiaryTransition(models.Model):
                 "default_relationship": self.relationship,
                 "default_relationship_detail": (self.relationship_detail),
                 "default_special_condition": (self.special_condition),
-                "default_end_date": (fields.Date.context_today(self)),
-                "default_start_date": (fields.Date.context_today(self)),
+                "default_end_date": today,
+                "default_start_date": today,
             },
         }
