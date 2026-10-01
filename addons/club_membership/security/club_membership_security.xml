@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ============================================================
+         CATEGORÍA DE SEGURIDAD DEL CLUB
+         ============================================================ -->
+
+    <record id="module_category_club_social" model="ir.module.category">
+        <field name="name">Club Social</field>
+        <field name="description">
+            Permisos específicos del Sistema de Gestión del Club Social.
+        </field>
+        <field name="sequence">30</field>
+    </record>
+
+    <!-- ============================================================
+         AUDITORÍA DE IDENTIDAD
+         ============================================================ -->
+
+    <record id="group_club_identity_history" model="res.groups">
+        <field name="name">Consultar historial de identidad</field>
+        <field
+            name="category_id"
+            ref="club_membership.module_category_club_social"
+        />
+    </record>
+
+    <record id="group_club_identity_correction" model="res.groups">
+        <field name="name">Corregir identidad</field>
+        <field
+            name="category_id"
+            ref="club_membership.module_category_club_social"
+        />
+        <field
+            name="implied_ids"
+            eval="[(4, ref('club_membership.group_club_identity_history'))]"
+        />
+    </record>
+
+    <!--
+        Los administradores del sistema reciben automáticamente
+        autorización para corregir identidad.
+
+        Los perfiles funcionales definitivos del Club se configurarán
+        posteriormente sin depender de base.group_user.
+    -->
+    <record id="base.group_system" model="res.groups">
+        <field
+            name="implied_ids"
+            eval="[(4, ref('club_membership.group_club_identity_correction'))]"
+        />
+    </record>
+</odoo>

@@ -46,6 +46,10 @@ class ClubKardexEvent(models.Model):
                 "Modificación de identificación",
             ),
             (
+                "member_identity_corrected",
+                "Corrección de identidad",
+            ),
+            (
                 "member_code_changed",
                 "Cambio de código de asociado",
             ),
@@ -151,6 +155,13 @@ class ClubKardexEvent(models.Model):
         ondelete="restrict",
     )
 
+    person_audit_event_id = fields.Many2one(
+        comodel_name="club.person.audit.event",
+        string="Auditoría de identidad relacionada",
+        readonly=True,
+        ondelete="restrict",
+    )
+
     origin = fields.Selection(
         selection=[
             ("manual", "Manual"),
@@ -217,14 +228,22 @@ class ClubKardexEvent(models.Model):
             )
 
         beneficiary = event_data.get("beneficiary")
-
         certificate = event_data.get("certificate")
+        person_audit_event = event_data.get("person_audit_event")
 
         if certificate and certificate.member_id != member:
             raise ValidationError(
                 self.env._(
                     "El certificado relacionado debe pertenecer "
                     "al mismo socio del evento de Kardex."
+                )
+            )
+
+        if person_audit_event and person_audit_event.person_id != member:
+            raise ValidationError(
+                self.env._(
+                    "La auditoría de identidad relacionada debe "
+                    "pertenecer a la misma Persona del Socio."
                 )
             )
 
@@ -239,6 +258,9 @@ class ClubKardexEvent(models.Model):
             "reason": (event_data.get("reason") or False),
             "beneficiary_id": (beneficiary.id if beneficiary else False),
             "certificate_id": (certificate.id if certificate else False),
+            "person_audit_event_id": (
+                person_audit_event.id if person_audit_event else False
+            ),
             "origin": origin,
         }
 

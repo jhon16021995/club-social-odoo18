@@ -3,3 +3,5 @@ access_club_beneficiary_internal,club.beneficiary internal,model_club_beneficiar
 access_club_certificate_internal,club.certificate internal,model_club_certificate,base.group_user,1,1,1,0
 access_club_kardex_event_internal,club.kardex.event internal,model_club_kardex_event,base.group_user,1,0,0,0
 access_club_beneficiary_transition_wizard_internal,club.beneficiary.transition.wizard internal,model_club_beneficiary_transition_wizard,base.group_user,1,1,1,1
+access_club_person_audit_event_history,club.person.audit.event history,model_club_person_audit_event,club_membership.group_club_identity_history,1,0,0,0
+access_club_person_identity_correction_wizard,club.person.identity.correction.wizard,model_club_person_identity_correction_wizard,club_membership.group_club_identity_correction,1,1,1,1

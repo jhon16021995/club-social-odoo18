@@ -1,0 +1,345 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ============================================================
+         ASISTENTE DE CORRECCIÓN DE IDENTIDAD
+         ============================================================ -->
+
+    <record
+        id="view_club_person_identity_correction_wizard_form"
+        model="ir.ui.view"
+    >
+        <field name="name">club.person.identity.correction.wizard.form</field>
+        <field name="model">club.person.identity.correction.wizard</field>
+
+        <field name="arch" type="xml">
+            <form string="Corregir identidad">
+                <group string="Persona">
+                    <field
+                        name="person_id"
+                        readonly="1"
+                        options="{
+                            'no_create': True,
+                            'no_open': True
+                        }"
+                    />
+                </group>
+
+                <group string="Corrección">
+                    <field
+                        name="field_name"
+                        required="1"
+                    />
+
+                    <field
+                        name="current_value"
+                        readonly="1"
+                    />
+
+                    <field
+                        name="new_text_value"
+                        string="Valor nuevo"
+                        invisible="field_name == 'club_birthdate'"
+                        required="
+                            field_name == 'name'
+                            or field_name == 'club_id_number'
+                        "
+                    />
+
+                    <field
+                        name="new_birthdate_value"
+                        string="Valor nuevo"
+                        invisible="field_name != 'club_birthdate'"
+                        required="field_name == 'club_birthdate'"
+                    />
+
+                    <field
+                        name="reason"
+                        required="1"
+                        placeholder="Explique claramente por qué se realiza la corrección..."
+                    />
+                </group>
+
+                <div class="alert alert-info" role="alert">
+                    La corrección quedará registrada en el historial
+                    de identidad con el usuario, fecha, valor anterior,
+                    valor nuevo y motivo.
+                </div>
+
+                <footer>
+                    <button
+                        name="action_confirm"
+                        string="Aplicar corrección"
+                        type="object"
+                        class="btn-primary"
+                    />
+
+                    <button
+                        string="Cancelar"
+                        special="cancel"
+                        class="btn-secondary"
+                    />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record
+        id="action_club_person_identity_correction_wizard"
+        model="ir.actions.act_window"
+    >
+        <field name="name">Corregir identidad</field>
+        <field name="res_model">club.person.identity.correction.wizard</field>
+        <field name="view_mode">form</field>
+        <field
+            name="view_id"
+            ref="view_club_person_identity_correction_wizard_form"
+        />
+        <field name="target">new</field>
+    </record>
+
+    <!-- ============================================================
+         FICHA PRINCIPAL DEL CLUB
+         ============================================================ -->
+
+    <record
+        id="view_partner_form_club_identity_correction"
+        model="ir.ui.view"
+    >
+        <field name="name">res.partner.form.club.identity.correction</field>
+        <field name="model">res.partner</field>
+
+        <field
+            name="inherit_id"
+            ref="view_partner_form_club_membership"
+        />
+
+        <field name="arch" type="xml">
+            <xpath
+                expr="//field[@name='name']"
+                position="attributes"
+            >
+                <attribute name="readonly">id</attribute>
+            </xpath>
+
+            <xpath
+                expr="//field[@name='club_id_number']"
+                position="attributes"
+            >
+                <attribute name="readonly">id</attribute>
+            </xpath>
+
+            <xpath
+                expr="//field[@name='club_id_extension']"
+                position="attributes"
+            >
+                <attribute name="readonly">id</attribute>
+            </xpath>
+
+            <xpath
+                expr="//field[@name='club_birthdate']"
+                position="attributes"
+            >
+                <attribute name="readonly">id</attribute>
+            </xpath>
+
+            <xpath
+                expr="//form/sheet"
+                position="before"
+            >
+                <header>
+                    <button
+                        name="%(action_club_person_identity_correction_wizard)d"
+                        type="action"
+                        string="Corregir identidad"
+                        class="oe_highlight"
+                        groups="club_membership.group_club_identity_correction"
+                        context="{
+                            'default_person_id': id
+                        }"
+                        invisible="not id"
+                    />
+                </header>
+            </xpath>
+
+            <xpath
+                expr="//form/sheet/notebook"
+                position="after"
+            >
+                <notebook
+                    groups="club_membership.group_club_identity_history"
+                    invisible="not id"
+                >
+                    <page
+                        string="Historial de identidad"
+                        name="club_identity_history"
+                    >
+                        <field
+                            name="club_person_audit_event_ids"
+                            readonly="1"
+                        >
+                            <list
+                                string="Historial de identidad"
+                                create="false"
+                                edit="false"
+                                delete="false"
+                            >
+                                <field
+                                    name="event_datetime"
+                                    string="Fecha y hora"
+                                />
+
+                                <field
+                                    name="field_name"
+                                    string="Dato corregido"
+                                />
+
+                                <field
+                                    name="old_value"
+                                    string="Valor anterior"
+                                />
+
+                                <field
+                                    name="new_value"
+                                    string="Valor nuevo"
+                                />
+
+                                <field
+                                    name="reason"
+                                    string="Motivo"
+                                />
+
+                                <field
+                                    name="user_id"
+                                    string="Usuario"
+                                />
+                            </list>
+                        </field>
+                    </page>
+                </notebook>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         FORMULARIO DE IDENTIDAD DE PERSONA BENEFICIARIA
+         ============================================================ -->
+
+    <record
+        id="view_partner_form_beneficiary_identity_correction"
+        model="ir.ui.view"
+    >
+        <field name="name">res.partner.form.beneficiary.identity.correction</field>
+        <field name="model">res.partner</field>
+
+        <field
+            name="inherit_id"
+            ref="view_partner_form_club_person_identity"
+        />
+
+        <field name="arch" type="xml">
+            <xpath
+                expr="//field[@name='name']"
+                position="attributes"
+            >
+                <attribute name="readonly">id</attribute>
+            </xpath>
+
+            <xpath
+                expr="//field[@name='club_id_number']"
+                position="attributes"
+            >
+                <attribute name="readonly">id</attribute>
+            </xpath>
+
+            <xpath
+                expr="//field[@name='club_id_extension']"
+                position="attributes"
+            >
+                <attribute name="readonly">id</attribute>
+            </xpath>
+
+            <xpath
+                expr="//field[@name='club_birthdate']"
+                position="attributes"
+            >
+                <attribute name="readonly">id</attribute>
+            </xpath>
+
+            <xpath
+                expr="//form/sheet"
+                position="before"
+            >
+                <header>
+                    <button
+                        name="%(action_club_person_identity_correction_wizard)d"
+                        type="action"
+                        string="Corregir identidad"
+                        class="oe_highlight"
+                        groups="club_membership.group_club_identity_correction"
+                        context="{
+                            'default_person_id': id
+                        }"
+                        invisible="not id"
+                    />
+                </header>
+            </xpath>
+
+            <xpath
+                expr="//form/sheet"
+                position="inside"
+            >
+                <notebook
+                    groups="club_membership.group_club_identity_history"
+                    invisible="not id"
+                >
+                    <page
+                        string="Historial de identidad"
+                        name="club_beneficiary_identity_history"
+                    >
+                        <field
+                            name="club_person_audit_event_ids"
+                            readonly="1"
+                        >
+                            <list
+                                string="Historial de identidad"
+                                create="false"
+                                edit="false"
+                                delete="false"
+                            >
+                                <field
+                                    name="event_datetime"
+                                    string="Fecha y hora"
+                                />
+
+                                <field
+                                    name="field_name"
+                                    string="Dato corregido"
+                                />
+
+                                <field
+                                    name="old_value"
+                                    string="Valor anterior"
+                                />
+
+                                <field
+                                    name="new_value"
+                                    string="Valor nuevo"
+                                />
+
+                                <field
+                                    name="reason"
+                                    string="Motivo"
+                                />
+
+                                <field
+                                    name="user_id"
+                                    string="Usuario"
+                                />
+                            </list>
+                        </field>
+                    </page>
+                </notebook>
+            </xpath>
+        </field>
+    </record>
+</odoo>
