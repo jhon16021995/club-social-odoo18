@@ -61,14 +61,16 @@ class ClubBeneficiaryTransitionWizard(models.TransientModel):
 
     relationship = fields.Selection(
         selection=[
-            ("spouse", "Esposo(a)"),
-            ("partner", "Pareja de hecho"),
+            ("spouse", "Cónyuge"),
+            ("partner", "Pareja"),
             ("child", "Hijo(a)"),
             ("stepchild", "Hijastro(a)"),
             ("parent", "Padre o madre"),
-            ("sibling", "Hermano(a)"),
             ("worker", "Trabajador"),
-            ("other", "Otro vínculo"),
+            (
+                "family_dependent",
+                "Familiar dependiente",
+            ),
         ],
         string="Nuevo vínculo",
     )
@@ -80,10 +82,6 @@ class ClubBeneficiaryTransitionWizard(models.TransientModel):
     special_condition = fields.Selection(
         selection=[
             ("none", "Ninguna"),
-            (
-                "legal_guardianship",
-                "Bajo tutela legal del Socio",
-            ),
             (
                 "health_dependent",
                 "Dependiente por condición de salud",
@@ -133,11 +131,25 @@ class ClubBeneficiaryTransitionWizard(models.TransientModel):
                 self.env._("Debe indicar la fecha de inicio del nuevo vínculo.")
             )
 
+        relationship_detail = (self.relationship_detail or "").strip()
+
+        if self.relationship == "family_dependent" and not relationship_detail:
+            raise ValidationError(
+                self.env._(
+                    "Debe indicar el detalle cuando "
+                    "el nuevo vínculo sea "
+                    "Familiar dependiente."
+                )
+            )
+
+        if self.relationship != "family_dependent":
+            relationship_detail = False
+
         new_link = self.beneficiary_id.reassign_link(
             {
                 "new_member_id": self.new_member_id.id,
                 "relationship": self.relationship,
-                "relationship_detail": self.relationship_detail,
+                "relationship_detail": relationship_detail,
                 "special_condition": (self.special_condition or "none"),
                 "end_date": self.end_date,
                 "start_date": self.start_date,

@@ -376,8 +376,8 @@
                                                 <field
                                                     name="relationship_detail"
                                                     string="Detalle del vínculo"
-                                                    invisible="relationship != 'other'"
-                                                    required="relationship == 'other'"
+                                                    invisible="relationship != 'family_dependent'"
+                                                    required="relationship == 'family_dependent'"
                                                     readonly="state == 'finalized'"
                                                 />
 
@@ -702,8 +702,8 @@
                             <field
                                 name="relationship_detail"
                                 string="Detalle del vínculo"
-                                invisible="relationship != 'other'"
-                                required="relationship == 'other'"
+                                invisible="relationship != 'family_dependent'"
+                                required="relationship == 'family_dependent'"
                                 readonly="state == 'finalized'"
                             />
 
@@ -871,9 +871,9 @@
                 />
 
                 <filter
-                    string="Hermanos"
-                    name="beneficiary_siblings"
-                    domain="[('relationship', '=', 'sibling')]"
+                    string="Familiares dependientes"
+                    name="beneficiary_family_dependents"
+                    domain="[('relationship', '=', 'family_dependent')]"
                 />
 
                 <filter
@@ -883,12 +883,6 @@
                 />
 
                 <separator/>
-
-                <filter
-                    string="Bajo tutela legal"
-                    name="beneficiary_guardianship"
-                    domain="[('special_condition', '=', 'legal_guardianship')]"
-                />
 
                 <filter
                     string="Dependencia por salud"

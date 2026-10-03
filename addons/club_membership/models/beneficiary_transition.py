@@ -77,6 +77,7 @@ class ClubBeneficiaryTransition(models.Model):
         self,
         end_date,
         reason,
+        extra_vals=None,
     ):
         self.ensure_one()
 
@@ -85,22 +86,34 @@ class ClubBeneficiaryTransition(models.Model):
                 self.env._("Este vínculo de Beneficiario ya está finalizado.")
             )
 
-        self.with_context(club_beneficiary_internal_transition_write=True).write(
-            {
-                "state": "finalized",
-                "end_date": end_date,
-                "end_reason": reason,
-            }
-        )
+        vals = {
+            "state": "finalized",
+            "end_date": end_date,
+            "end_reason": reason,
+            "block_reason": False,
+        }
+
+        vals.update(dict(extra_vals or {}))
+
+        self.with_context(
+            club_beneficiary_internal_transition_write=True,
+            club_beneficiary_skip_change_logging=True,
+        ).write(vals)
 
     def finalize_link(
         self,
         end_date=None,
         reason=None,
+        origin="manual",
     ):
         self.ensure_one()
 
         reason = self._validate_transition_reason(reason)
+
+        if origin not in ("manual", "automatic"):
+            raise ValidationError(
+                self.env._("El origen de la finalización debe ser Manual o Automático.")
+            )
 
         end_date, _start_date = self._prepare_transition_dates(
             end_date=end_date,
@@ -129,7 +142,7 @@ class ClubBeneficiaryTransition(models.Model):
                 "state",
             ),
             reason=reason,
-            origin="manual",
+            origin=origin,
         )
 
         return True
@@ -174,19 +187,22 @@ class ClubBeneficiaryTransition(models.Model):
             )
 
         relationship_detail = (
-            (relationship_detail or "").strip() if relationship == "other" else False
+            (relationship_detail or "").strip()
+            if relationship == "family_dependent"
+            else False
         )
 
-        if relationship == "other" and not relationship_detail:
+        if relationship == "family_dependent" and not relationship_detail:
             raise ValidationError(
                 self.env._(
-                    "Debe indicar el detalle cuando el nuevo vínculo sea Otro vínculo."
+                    "Debe indicar el detalle cuando el nuevo vínculo "
+                    "sea Familiar dependiente."
                 )
             )
 
         current_detail = (
             (self.relationship_detail or "").strip()
-            if self.relationship == "other"
+            if self.relationship == "family_dependent"
             else False
         )
 
@@ -338,8 +354,8 @@ class ClubBeneficiaryTransition(models.Model):
                 "default_operation": "reassign",
                 "default_new_member_id": self.member_id.id,
                 "default_relationship": self.relationship,
-                "default_relationship_detail": (self.relationship_detail),
-                "default_special_condition": (self.special_condition),
+                "default_relationship_detail": self.relationship_detail,
+                "default_special_condition": self.special_condition,
                 "default_end_date": today,
                 "default_start_date": today,
             },

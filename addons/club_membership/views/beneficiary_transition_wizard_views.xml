@@ -53,10 +53,10 @@
 
                     <field
                         name="relationship_detail"
-                        invisible="relationship != 'other'"
+                        invisible="relationship != 'family_dependent'"
                         required="
                             operation == 'reassign'
-                            and relationship == 'other'
+                            and relationship == 'family_dependent'
                         "
                     />
 

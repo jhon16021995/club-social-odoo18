@@ -10,10 +10,10 @@ class ClubBeneficiary(models.Model):
     _AGE_LIMITED_RELATIONSHIPS = {
         "child",
         "stepchild",
+        "family_dependent",
     }
 
     _AGE_EXEMPT_SPECIAL_CONDITIONS = {
-        "legal_guardianship",
         "health_dependent",
     }
 
@@ -91,14 +91,13 @@ class ClubBeneficiary(models.Model):
 
     relationship = fields.Selection(
         selection=[
-            ("spouse", "Esposo(a)"),
-            ("partner", "Pareja de hecho"),
+            ("spouse", "Cónyuge"),
+            ("partner", "Pareja"),
             ("child", "Hijo(a)"),
             ("stepchild", "Hijastro(a)"),
             ("parent", "Padre o madre"),
-            ("sibling", "Hermano(a)"),
             ("worker", "Trabajador"),
-            ("other", "Otro vínculo"),
+            ("family_dependent", "Familiar dependiente"),
         ],
         string="Vínculo con el Socio",
         required=True,
@@ -111,10 +110,6 @@ class ClubBeneficiary(models.Model):
     special_condition = fields.Selection(
         selection=[
             ("none", "Ninguna"),
-            (
-                "legal_guardianship",
-                "Bajo tutela legal del Socio",
-            ),
             (
                 "health_dependent",
                 "Dependiente por condición de salud",
@@ -181,13 +176,10 @@ class ClubBeneficiary(models.Model):
     @api.model
     def _get_person_from_values(self, vals, beneficiary=None):
         person_id = vals.get("person_id")
-
         if person_id:
             return self.env["res.partner"].browse(person_id)
-
         if beneficiary:
             return beneficiary.person_id
-
         return self.env["res.partner"]
 
     @api.model
@@ -196,76 +188,51 @@ class ClubBeneficiary(models.Model):
             "state",
             beneficiary.state if beneficiary else "active",
         )
-
         if state == "finalized":
             return False
-
         relationship = vals.get(
             "relationship",
             beneficiary.relationship if beneficiary else False,
         )
-
         special_condition = vals.get(
             "special_condition",
             beneficiary.special_condition if beneficiary else "none",
         )
-
         if relationship not in self._AGE_LIMITED_RELATIONSHIPS:
             return False
-
         if special_condition in self._AGE_EXEMPT_SPECIAL_CONDITIONS:
             return False
-
         person = self._get_person_from_values(
             vals,
             beneficiary=beneficiary,
         )
-
         if not person or not person.club_birthdate:
             return False
-
         return person.club_age >= 25
 
     @api.model
-    def _prepare_age_block_values(self, vals, beneficiary=None):
+    def _prepare_relationship_values(self, vals):
         prepared_vals = dict(vals)
-
-        target_state = prepared_vals.get(
-            "state",
-            beneficiary.state if beneficiary else "active",
-        )
-
-        if target_state == "finalized":
-            return prepared_vals
-
-        age_limit_reached = self._is_age_limit_reached(
-            prepared_vals,
-            beneficiary=beneficiary,
-        )
-
-        if age_limit_reached:
-            prepared_vals["state"] = "blocked"
-
-            current_reason = beneficiary.block_reason if beneficiary else False
-
-            if not prepared_vals.get("block_reason") and not current_reason:
-                prepared_vals["block_reason"] = self.env._("Límite de edad alcanzado")
-
-            return prepared_vals
-
-        if (
-            beneficiary
-            and beneficiary.state == "blocked"
-            and beneficiary.block_reason == self.env._("Límite de edad alcanzado")
-        ):
-            prepared_vals["state"] = "active"
-            prepared_vals["block_reason"] = False
-            return prepared_vals
-
-        if prepared_vals.get("state") == "active":
-            prepared_vals["block_reason"] = False
-
+        if prepared_vals.get("relationship") == "family_dependent":
+            detail = (prepared_vals.get("relationship_detail") or "").strip()
+            prepared_vals["relationship_detail"] = detail or False
+        elif "relationship" in prepared_vals:
+            prepared_vals["relationship_detail"] = False
         return prepared_vals
+
+    @api.model
+    def _age_limit_reason(self, beneficiary, vals):
+        old_special_condition = beneficiary.special_condition
+        new_special_condition = vals.get(
+            "special_condition",
+            old_special_condition,
+        )
+        if (
+            old_special_condition == "health_dependent"
+            and new_special_condition != "health_dependent"
+        ):
+            return self.env._("Fin de condición especial con límite de edad cumplido")
+        return self.env._("Límite de edad alcanzado")
 
     @api.constrains(
         "person_id",
@@ -278,27 +245,22 @@ class ClubBeneficiary(models.Model):
         for beneficiary in self:
             person = beneficiary.person_id
             member = beneficiary.member_id
-
             if not person:
                 continue
-
             if person.is_company:
                 raise ValidationError(
                     self.env._(
                         "La persona beneficiaria debe ser una persona individual."
                     )
                 )
-
             if member.club_person_type != "member":
                 raise ValidationError(
                     self.env._("El titular de un beneficiario debe ser un socio.")
                 )
-
             if person == member:
                 raise ValidationError(
                     self.env._("Una persona no puede ser beneficiaria de sí misma.")
                 )
-
             if beneficiary.relationship == "worker" and not member.is_company:
                 raise ValidationError(
                     self.env._(
@@ -306,18 +268,26 @@ class ClubBeneficiary(models.Model):
                         "cuando el Socio titular es una empresa."
                     )
                 )
-
             if (
-                beneficiary.relationship == "other"
-                and not beneficiary.relationship_detail
+                beneficiary.relationship == "family_dependent"
+                and not (beneficiary.relationship_detail or "").strip()
             ):
                 raise ValidationError(
                     self.env._(
                         "Debe indicar el detalle cuando el vínculo "
-                        "seleccionado sea Otro vínculo."
+                        "seleccionado sea Familiar dependiente."
                     )
                 )
-
+            if (
+                beneficiary.relationship != "family_dependent"
+                and beneficiary.relationship_detail
+            ):
+                raise ValidationError(
+                    self.env._(
+                        "El detalle del vínculo solo corresponde a "
+                        "Familiar dependiente."
+                    )
+                )
             if beneficiary.state not in ("active", "blocked"):
                 continue
 
@@ -407,15 +377,19 @@ class ClubBeneficiary(models.Model):
                     )
                 )
 
-            if beneficiary.state == "active" and self._is_age_limit_reached(
+            if beneficiary.state in (
+                "active",
+                "blocked",
+            ) and self._is_age_limit_reached(
                 {},
                 beneficiary=beneficiary,
             ):
                 raise ValidationError(
                     self.env._(
-                        "Los hijos e hijastros de 25 años o más deben "
-                        "estar bloqueados, salvo que tengan una condición "
-                        "especial vigente."
+                        "Hijo(a), Hijastro(a) y Familiar dependiente "
+                        "no pueden mantener un vínculo vigente desde "
+                        "los 25 años, salvo que tengan la condición "
+                        "Dependiente por condición de salud."
                     )
                 )
 
@@ -468,7 +442,11 @@ class ClubBeneficiary(models.Model):
                     )
                 )
 
-    def _format_kardex_value(self, beneficiary, field_name):
+    def _format_kardex_value(
+        self,
+        beneficiary,
+        field_name,
+    ):
         field = beneficiary._fields[field_name]
         value = beneficiary[field_name]
 
@@ -481,16 +459,27 @@ class ClubBeneficiary(models.Model):
         if field.type == "selection":
             field_description = beneficiary.fields_get([field_name])[field_name]
 
-            selection = dict(field_description.get("selection", []))
+            selection = dict(
+                field_description.get(
+                    "selection",
+                    [],
+                )
+            )
 
-            return selection.get(value, value)
+            return selection.get(
+                value,
+                value,
+            )
 
         if field.type == "date":
             return fields.Date.to_string(value)
 
         return str(value)
 
-    def _get_kardex_snapshot(self, beneficiary):
+    def _get_kardex_snapshot(
+        self,
+        beneficiary,
+    ):
         field_names = (
             *self._KARDEX_TRACKED_FIELDS,
             "state",
@@ -533,7 +522,10 @@ class ClubBeneficiary(models.Model):
 
             new_lines.append(f"{field_label}: {new_value}")
 
-        return "\n".join(old_lines), "\n".join(new_lines)
+        return (
+            "\n".join(old_lines),
+            "\n".join(new_lines),
+        )
 
     def _log_kardex_event(
         self,
@@ -552,7 +544,10 @@ class ClubBeneficiary(models.Model):
             **event_data,
         )
 
-    def _log_beneficiary_created(self, beneficiary):
+    def _log_beneficiary_created(
+        self,
+        beneficiary,
+    ):
         new_value = "\n".join(
             [
                 self.env._(
@@ -607,14 +602,13 @@ class ClubBeneficiary(models.Model):
         tracked_fields = list(self._KARDEX_TRACKED_FIELDS)
 
         if not state_changed:
-            tracked_fields.append("block_reason")
-
-        tracked_fields.extend(
-            [
-                "end_date",
-                "end_reason",
-            ]
-        )
+            tracked_fields.extend(
+                [
+                    "block_reason",
+                    "end_date",
+                    "end_reason",
+                ]
+            )
 
         old_value, new_value = self._build_kardex_change_values(
             beneficiary,
@@ -650,38 +644,20 @@ class ClubBeneficiary(models.Model):
             return
 
         if new_state == "blocked":
-            automatic_age_block = change_data["automatic_age_block"]
-
-            event_type = (
-                "beneficiary_age_blocked"
-                if automatic_age_block
-                else "beneficiary_blocked"
-            )
-
-            description = (
-                self.env._(
-                    "Beneficiario %(name)s bloqueado "
-                    "automáticamente por límite de edad.",
-                    name=beneficiary.name,
-                )
-                if automatic_age_block
-                else self.env._(
-                    "Beneficiario %(name)s bloqueado.",
-                    name=beneficiary.name,
-                )
-            )
-
             self._log_kardex_event(
                 beneficiary,
-                event_type,
-                description,
+                "beneficiary_blocked",
+                self.env._(
+                    "Beneficiario %(name)s bloqueado.",
+                    name=beneficiary.name,
+                ),
                 old_value=before_values["state"],
                 new_value=self._format_kardex_value(
                     beneficiary,
                     "state",
                 ),
                 reason=beneficiary.block_reason,
-                origin=("automatic" if automatic_age_block else "manual"),
+                origin="manual",
             )
             return
 
@@ -708,29 +684,41 @@ class ClubBeneficiary(models.Model):
                     if previous_reason != self.env._("Sin valor")
                     else False
                 ),
-                origin=(
-                    "automatic"
-                    if change_data["automatic_age_reactivation"]
-                    else "manual"
-                ),
+                origin="manual",
             )
             return
 
         if new_state == "finalized":
-            self._log_kardex_event(
-                beneficiary,
-                "beneficiary_updated",
+            automatic_age_finalization = change_data.get(
+                "automatic_age_finalization",
+                False,
+            )
+
+            description = (
                 self.env._(
+                    "Vínculo del Beneficiario %(name)s "
+                    "finalizado automáticamente por "
+                    "regla de edad.",
+                    name=beneficiary.name,
+                )
+                if automatic_age_finalization
+                else self.env._(
                     "Vínculo del Beneficiario %(name)s finalizado.",
                     name=beneficiary.name,
-                ),
+                )
+            )
+
+            self._log_kardex_event(
+                beneficiary,
+                "beneficiary_finalized",
+                description,
                 old_value=before_values["state"],
                 new_value=self._format_kardex_value(
                     beneficiary,
                     "state",
                 ),
                 reason=beneficiary.end_reason,
-                origin="manual",
+                origin=("automatic" if automatic_age_finalization else "manual"),
             )
 
     def _log_beneficiary_write_changes(
@@ -755,9 +743,23 @@ class ClubBeneficiary(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        prepared_vals_list = [
-            self._prepare_age_block_values(vals) for vals in vals_list
-        ]
+        prepared_vals_list = []
+
+        for original_vals in vals_list:
+            vals = self._prepare_relationship_values(original_vals)
+
+            if self._is_age_limit_reached(vals):
+                raise ValidationError(
+                    self.env._(
+                        "No puede registrarse un Hijo(a), "
+                        "Hijastro(a) o Familiar dependiente "
+                        "de 25 años o más como Beneficiario "
+                        "vigente, salvo que tenga la condición "
+                        "Dependiente por condición de salud."
+                    )
+                )
+
+            prepared_vals_list.append(vals)
 
         beneficiaries = super().create(prepared_vals_list)
 
@@ -767,22 +769,29 @@ class ClubBeneficiary(models.Model):
         return beneficiaries
 
     def write(self, vals):
-        conversion_write = self.env.context.get("club_beneficiary_conversion_write")
+        vals = dict(vals)
 
-        automatic_age_context = self.env.context.get(
-            "club_beneficiary_automatic_age_block"
+        internal_transition_write = self.env.context.get(
+            "club_beneficiary_internal_transition_write"
         )
 
+        skip_change_logging = self.env.context.get(
+            "club_beneficiary_skip_change_logging"
+        )
+
+        if internal_transition_write:
+            return super().write(vals)
+
         for beneficiary in self:
-            if beneficiary.state == "finalized" and not conversion_write:
+            if beneficiary.state == "finalized":
                 raise ValidationError(
                     self.env._(
-                        "Un vínculo de Beneficiario finalizado es "
-                        "histórico y no puede modificarse."
+                        "Un vínculo de Beneficiario finalizado "
+                        "es histórico y no puede modificarse."
                     )
                 )
 
-            if ("person_id" in vals or "member_id" in vals) and not conversion_write:
+            if "person_id" in vals or "member_id" in vals:
                 raise ValidationError(
                     self.env._(
                         "La persona y el Socio titular no pueden "
@@ -794,46 +803,41 @@ class ClubBeneficiary(models.Model):
             before_values = self._get_kardex_snapshot(beneficiary)
 
             old_state = beneficiary.state
-            old_reason = beneficiary.block_reason
 
-            prepared_vals = self._prepare_age_block_values(
-                vals,
+            prepared_vals = dict(vals)
+
+            if "relationship" in prepared_vals:
+                prepared_vals = self._prepare_relationship_values(prepared_vals)
+
+            automatic_age_finalization = self._is_age_limit_reached(
+                prepared_vals,
                 beneficiary=beneficiary,
             )
 
-            automatic_age_block = bool(
-                automatic_age_context
-                or (
-                    old_state != "blocked"
-                    and prepared_vals.get(
-                        "state",
-                        old_state,
-                    )
-                    == "blocked"
-                    and prepared_vals.get(
-                        "block_reason",
-                        old_reason,
-                    )
-                    == self.env._("Límite de edad alcanzado")
+            if automatic_age_finalization:
+                prepared_vals.update(
+                    {
+                        "state": "finalized",
+                        "end_date": (fields.Date.context_today(beneficiary)),
+                        "end_reason": (
+                            self._age_limit_reason(
+                                beneficiary,
+                                prepared_vals,
+                            )
+                        ),
+                        "block_reason": False,
+                    }
                 )
-            )
 
-            automatic_age_reactivation = bool(
-                old_state == "blocked"
-                and old_reason == self.env._("Límite de edad alcanzado")
-                and prepared_vals.get(
-                    "state",
-                    old_state,
-                )
-                == "active"
-            )
+            elif prepared_vals.get("state") == "active":
+                prepared_vals["block_reason"] = False
 
             super(
                 ClubBeneficiary,
                 beneficiary,
             ).write(prepared_vals)
 
-            if conversion_write:
+            if skip_change_logging:
                 continue
 
             self._log_beneficiary_write_changes(
@@ -841,8 +845,7 @@ class ClubBeneficiary(models.Model):
                 before_values,
                 {
                     "old_state": old_state,
-                    "automatic_age_block": (automatic_age_block),
-                    "automatic_age_reactivation": (automatic_age_reactivation),
+                    "automatic_age_finalization": (automatic_age_finalization),
                 },
             )
 
@@ -861,9 +864,9 @@ class ClubBeneficiary(models.Model):
         if person.club_person_type == "client":
             raise ValidationError(
                 self.env._(
-                    "Esta persona todavía tiene la condición de Cliente. "
-                    "Debe finalizar primero esa condición antes de "
-                    "convertirse en Socio."
+                    "Esta persona todavía tiene la condición "
+                    "de Cliente. Debe finalizar primero esa "
+                    "condición antes de convertirse en Socio."
                 )
             )
 
@@ -871,8 +874,9 @@ class ClubBeneficiary(models.Model):
             raise ValidationError(
                 self.env._(
                     "Esta persona ya posee historial como Socio. "
-                    "La reactivación de un Socio Pasivo se realizará "
-                    "mediante el proceso específico de reactivación."
+                    "La reactivación de un Socio Pasivo se "
+                    "realizará mediante el proceso específico "
+                    "de reactivación."
                 )
             )
 
@@ -884,14 +888,13 @@ class ClubBeneficiary(models.Model):
             }
         )
 
-        self.with_context(club_beneficiary_conversion_write=True).write(
-            {
-                "state": "finalized",
-                "end_date": fields.Date.context_today(self),
-                "end_reason": self.env._("Conversión a Socio"),
+        self._write_finalized_transition(
+            fields.Date.context_today(self),
+            self.env._("Conversión a Socio"),
+            extra_vals={
                 "converted_member_id": person.id,
-                "converted_at": fields.Datetime.now(),
-            }
+                "converted_at": (fields.Datetime.now()),
+            },
         )
 
         self._log_kardex_event(
@@ -932,7 +935,9 @@ class ClubBeneficiary(models.Model):
         }
 
     @api.model
-    def _cron_block_age_limit_beneficiaries(self):
+    def _cron_finalize_age_limit_beneficiaries(
+        self,
+    ):
         beneficiaries = self.search(
             [
                 (
@@ -952,8 +957,8 @@ class ClubBeneficiary(models.Model):
                 ),
                 (
                     "state",
-                    "=",
-                    "active",
+                    "in",
+                    ("active", "blocked"),
                 ),
             ]
         )
@@ -963,14 +968,18 @@ class ClubBeneficiary(models.Model):
                 {},
                 beneficiary=beneficiary,
             ):
-                beneficiary.with_context(
-                    club_beneficiary_automatic_age_block=True
-                ).write(
-                    {
-                        "state": "blocked",
-                        "block_reason": self.env._("Límite de edad alcanzado"),
-                    }
+                beneficiary.finalize_link(
+                    end_date=(fields.Date.context_today(beneficiary)),
+                    reason=self.env._("Límite de edad alcanzado"),
+                    origin="automatic",
                 )
+
+    @api.model
+    def _cron_block_age_limit_beneficiaries(
+        self,
+    ):
+        """Compatibilidad con el cron ya instalado."""
+        return self._cron_finalize_age_limit_beneficiaries()
 
     @api.ondelete(at_uninstall=False)
     def _unlink_except_module_uninstall(self):
