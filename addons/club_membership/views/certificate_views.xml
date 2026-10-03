@@ -1,0 +1,532 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ============================================================
+         CERTIFICADO DENTRO DE LA FICHA DEL SOCIO
+         ============================================================ -->
+
+    <record id="view_partner_form_club_certificate" model="ir.ui.view">
+        <field name="name">res.partner.form.club.certificate</field>
+        <field name="model">res.partner</field>
+        <field
+            name="inherit_id"
+            ref="view_partner_form_club_membership"
+        />
+        <field name="arch" type="xml">
+            <xpath
+                expr="//page[@name='club_beneficiaries']"
+                position="after"
+            >
+                <page
+                    string="Certificado Patrimonial"
+                    name="club_certificate"
+                >
+                    <field
+                        name="club_certificate_ids"
+                        mode="list,form"
+                    >
+                        <list
+                            string="Certificado Patrimonial"
+                            create="true"
+                            delete="false"
+                        >
+                            <field
+                                name="certificate_number"
+                                string="Número"
+                                readonly="1"
+                            />
+
+                            <field
+                                name="registration_origin"
+                                string="Origen"
+                            />
+
+                            <field
+                                name="certificate_type"
+                                string="Tipo"
+                                readonly="1"
+                            />
+
+                            <field name="state"/>
+
+                            <field
+                                name="total_value"
+                                string="Valor total (Bs)"
+                            />
+
+                            <field
+                                name="opening_balance"
+                                string="Saldo inicial (Bs)"
+                                optional="hide"
+                            />
+
+                            <field
+                                name="opening_paid_amount"
+                                string="Pagado histórico (Bs)"
+                                readonly="1"
+                                optional="hide"
+                            />
+
+                            <field
+                                name="issue_date"
+                                string="Fecha de emisión"
+                            />
+                        </list>
+
+                        <form string="Certificado Patrimonial">
+                            <sheet>
+                                <field
+                                    name="member_id"
+                                    invisible="1"
+                                />
+
+                                <div class="oe_title">
+                                    <label
+                                        for="certificate_number"
+                                        string="Número de certificado"
+                                    />
+                                    <h1>
+                                        <field
+                                            name="certificate_number"
+                                            readonly="1"
+                                        />
+                                    </h1>
+                                </div>
+
+                                <group>
+                                    <group string="Datos del certificado">
+                                        <field
+                                            name="registration_origin"
+                                            string="Origen del registro"
+                                        />
+
+                                        <field
+                                            name="certificate_type"
+                                            readonly="1"
+                                        />
+
+                                        <field name="state"/>
+
+                                        <field
+                                            name="issue_date"
+                                            string="Fecha de emisión"
+                                        />
+                                    </group>
+
+                                    <group string="Valor del certificado">
+                                        <field
+                                            name="total_value"
+                                            string="Valor total (Bs)"
+                                        />
+
+                                        <field
+                                            name="opening_balance"
+                                            string="Deuda al momento de migración (Bs)"
+                                            invisible="registration_origin != 'migrated'"
+                                            required="registration_origin == 'migrated'"
+                                        />
+
+                                        <field
+                                            name="opening_paid_amount"
+                                            string="Pagado antes de la migración (Bs)"
+                                            readonly="1"
+                                            invisible="registration_origin != 'migrated'"
+                                        />
+                                    </group>
+                                </group>
+
+                                <group
+                                    string="Situación inicial"
+                                    invisible="registration_origin != 'new'"
+                                >
+                                    <group>
+                                        <label
+                                            for="opening_balance"
+                                            string="Saldo inicial"
+                                        />
+                                        <div>
+                                            <field
+                                                name="opening_balance"
+                                                readonly="1"
+                                                nolabel="1"
+                                            />
+                                            <span> Bs</span>
+                                        </div>
+                                    </group>
+
+                                    <group>
+                                        <label
+                                            for="opening_paid_amount"
+                                            string="Pagado previamente"
+                                        />
+                                        <div>
+                                            <field
+                                                name="opening_paid_amount"
+                                                readonly="1"
+                                                nolabel="1"
+                                            />
+                                            <span> Bs</span>
+                                        </div>
+                                    </group>
+                                </group>
+
+                                <group string="Observaciones">
+                                    <field
+                                        name="observations"
+                                        nolabel="1"
+                                        placeholder="Observaciones administrativas del certificado..."
+                                    />
+                                </group>
+                            </sheet>
+                        </form>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         LISTA GENERAL DE CERTIFICADOS PATRIMONIALES
+         ============================================================ -->
+
+    <record id="view_club_certificate_list" model="ir.ui.view">
+        <field name="name">club.certificate.list</field>
+        <field name="model">club.certificate</field>
+        <field name="arch" type="xml">
+            <list
+                string="Certificados Patrimoniales"
+                create="false"
+                delete="false"
+                decoration-success="state == 'active'"
+                decoration-muted="state == 'passive'"
+            >
+                <field
+                    name="certificate_number"
+                    string="Número"
+                />
+
+                <field
+                    name="member_id"
+                    string="Socio titular"
+                />
+
+                <field
+                    name="certificate_type"
+                    string="Tipo"
+                />
+
+                <field name="state"/>
+
+                <field
+                    name="registration_origin"
+                    string="Origen"
+                />
+
+                <field
+                    name="total_value"
+                    string="Valor total (Bs)"
+                />
+
+                <field
+                    name="opening_balance"
+                    string="Saldo inicial (Bs)"
+                    optional="show"
+                />
+
+                <field
+                    name="opening_paid_amount"
+                    string="Pagado histórico (Bs)"
+                    optional="hide"
+                />
+
+                <field
+                    name="issue_date"
+                    string="Fecha de emisión"
+                />
+            </list>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         FORMULARIO GENERAL DE CERTIFICADO PATRIMONIAL
+         ============================================================ -->
+
+    <record id="view_club_certificate_form" model="ir.ui.view">
+        <field name="name">club.certificate.form</field>
+        <field name="model">club.certificate</field>
+        <field name="arch" type="xml">
+            <form
+                string="Certificado Patrimonial"
+                create="false"
+                delete="false"
+            >
+                <sheet>
+                    <div class="oe_title">
+                        <label
+                            for="certificate_number"
+                            string="Número de certificado"
+                        />
+                        <h1>
+                            <field
+                                name="certificate_number"
+                                readonly="1"
+                            />
+                        </h1>
+                    </div>
+
+                    <group>
+                        <group string="Titular">
+                            <field
+                                name="member_id"
+                                string="Socio titular"
+                                readonly="1"
+                            />
+                        </group>
+
+                        <group string="Datos del certificado">
+                            <field
+                                name="registration_origin"
+                                string="Origen del registro"
+                                readonly="1"
+                            />
+
+                            <field
+                                name="certificate_type"
+                                string="Tipo"
+                                readonly="1"
+                            />
+
+                            <field name="state"/>
+
+                            <field
+                                name="issue_date"
+                                string="Fecha de emisión"
+                            />
+                        </group>
+                    </group>
+
+                    <group>
+                        <group string="Valor del certificado">
+                            <field
+                                name="total_value"
+                                string="Valor total (Bs)"
+                            />
+
+                            <field
+                                name="opening_balance"
+                                string="Deuda al momento de migración (Bs)"
+                                invisible="registration_origin != 'migrated'"
+                            />
+
+                            <field
+                                name="opening_paid_amount"
+                                string="Pagado antes de la migración (Bs)"
+                                readonly="1"
+                                invisible="registration_origin != 'migrated'"
+                            />
+                        </group>
+
+                        <group
+                            string="Situación inicial"
+                            invisible="registration_origin != 'new'"
+                        >
+                            <field
+                                name="opening_balance"
+                                string="Saldo inicial (Bs)"
+                                readonly="1"
+                            />
+
+                            <field
+                                name="opening_paid_amount"
+                                string="Pagado previamente (Bs)"
+                                readonly="1"
+                            />
+                        </group>
+                    </group>
+
+                    <group string="Observaciones">
+                        <field
+                            name="observations"
+                            nolabel="1"
+                            placeholder="Observaciones administrativas del certificado..."
+                        />
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         BÚSQUEDA GENERAL DE CERTIFICADOS PATRIMONIALES
+         ============================================================ -->
+
+    <record id="view_club_certificate_search" model="ir.ui.view">
+        <field name="name">club.certificate.search</field>
+        <field name="model">club.certificate</field>
+        <field name="arch" type="xml">
+            <search string="Buscar certificados patrimoniales">
+                <field
+                    name="certificate_number"
+                    string="Número de certificado"
+                />
+
+                <field
+                    name="member_id"
+                    string="Socio titular"
+                />
+
+                <field
+                    name="certificate_type"
+                    string="Tipo"
+                />
+
+                <field
+                    name="state"
+                    string="Estado"
+                />
+
+                <field
+                    name="registration_origin"
+                    string="Origen"
+                />
+
+                <separator/>
+
+                <filter
+                    string="Activos"
+                    name="certificate_active"
+                    domain="[('state', '=', 'active')]"
+                />
+
+                <filter
+                    string="Transferidos"
+                    name="certificate_transferred"
+                    domain="[('state', '=', 'transferred')]"
+                />
+
+                <filter
+                    string="Pasivos"
+                    name="certificate_passive"
+                    domain="[('state', '=', 'passive')]"
+                />
+
+                <separator/>
+
+                <filter
+                    string="Suscritos"
+                    name="certificate_subscribed"
+                    domain="[('certificate_type', '=', 'subscribed')]"
+                />
+
+                <filter
+                    string="Pagados"
+                    name="certificate_paid"
+                    domain="[('certificate_type', '=', 'paid')]"
+                />
+
+                <separator/>
+
+                <filter
+                    string="Nuevos"
+                    name="certificate_new"
+                    domain="[('registration_origin', '=', 'new')]"
+                />
+
+                <filter
+                    string="Migrados"
+                    name="certificate_migrated"
+                    domain="[('registration_origin', '=', 'migrated')]"
+                />
+
+                <group expand="0" string="Agrupar por">
+                    <filter
+                        string="Socio titular"
+                        name="group_certificate_member"
+                        context="{'group_by': 'member_id'}"
+                    />
+
+                    <filter
+                        string="Estado"
+                        name="group_certificate_state"
+                        context="{'group_by': 'state'}"
+                    />
+
+                    <filter
+                        string="Tipo"
+                        name="group_certificate_type"
+                        context="{'group_by': 'certificate_type'}"
+                    />
+
+                    <filter
+                        string="Origen"
+                        name="group_certificate_origin"
+                        context="{'group_by': 'registration_origin'}"
+                    />
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         ACCIÓN GENERAL DE CERTIFICADOS PATRIMONIALES
+         ============================================================ -->
+
+    <record id="action_club_certificates" model="ir.actions.act_window">
+        <field name="name">Certificados Patrimoniales</field>
+        <field name="res_model">club.certificate</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" eval="False"/>
+        <field
+            name="search_view_id"
+            ref="view_club_certificate_search"
+        />
+        <field name="context">
+            {
+                'create': False
+            }
+        </field>
+    </record>
+
+    <record
+        id="action_club_certificates_view_list"
+        model="ir.actions.act_window.view"
+    >
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">list</field>
+        <field
+            name="view_id"
+            ref="view_club_certificate_list"
+        />
+        <field
+            name="act_window_id"
+            ref="action_club_certificates"
+        />
+    </record>
+
+    <record
+        id="action_club_certificates_view_form"
+        model="ir.actions.act_window.view"
+    >
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">form</field>
+        <field
+            name="view_id"
+            ref="view_club_certificate_form"
+        />
+        <field
+            name="act_window_id"
+            ref="action_club_certificates"
+        />
+    </record>
+
+    <!-- ============================================================
+         MENÚ GENERAL DE CERTIFICADOS PATRIMONIALES
+         ============================================================ -->
+
+    <menuitem
+        id="menu_club_certificates"
+        name="Certificados Patrimoniales"
+        parent="menu_club_social_root"
+        action="action_club_certificates"
+        sequence="40"
+    />
+</odoo>
