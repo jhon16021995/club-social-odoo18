@@ -1,5 +1,8 @@
 from odoo import api, fields, models
-from odoo.exceptions import ValidationError
+from odoo.exceptions import AccessError, ValidationError
+
+_CLUB_BENEFICIARY_WITHDRAWAL_INTERNAL_TOKEN = object()
+_CLUB_BENEFICIARY_TRANSITION_INTERNAL_TOKEN = object()
 
 
 class ClubBeneficiary(models.Model):
@@ -147,6 +150,13 @@ class ClubBeneficiary(models.Model):
     block_reason = fields.Char(
         string="Motivo de bloqueo",
         copy=False,
+    )
+
+    blocked_by_member_withdrawal = fields.Boolean(
+        string="Bloqueado por retiro del Socio titular",
+        readonly=True,
+        copy=False,
+        index=True,
     )
 
     end_reason = fields.Char(
@@ -768,14 +778,55 @@ class ClubBeneficiary(models.Model):
 
         return beneficiaries
 
+    def _write_member_withdrawal_values_internal(self, vals):
+        return self.with_context(
+            club_beneficiary_withdrawal_internal_token=(
+                _CLUB_BENEFICIARY_WITHDRAWAL_INTERNAL_TOKEN
+            )
+        ).write(vals)
+
     def write(self, vals):
         vals = dict(vals)
 
-        internal_transition_write = self.env.context.get(
-            "club_beneficiary_internal_transition_write"
+        internal_withdrawal_write = (
+            self.env.context.get("club_beneficiary_withdrawal_internal_token")
+            is _CLUB_BENEFICIARY_WITHDRAWAL_INTERNAL_TOKEN
         )
 
-        skip_change_logging = self.env.context.get(
+        internal_transition_write = (
+            self.env.context.get("club_beneficiary_internal_transition_token")
+            is _CLUB_BENEFICIARY_TRANSITION_INTERNAL_TOKEN
+        )
+
+        if (
+            "blocked_by_member_withdrawal" in vals
+            and not internal_withdrawal_write
+            and not internal_transition_write
+        ):
+            raise AccessError(
+                self.env._(
+                    "La marca técnica de bloqueo por retiro del Socio "
+                    "solo puede modificarse mediante un proceso "
+                    "controlado del sistema."
+                )
+            )
+
+        if (
+            "state" in vals
+            and vals.get("state") != "blocked"
+            and not internal_withdrawal_write
+            and not internal_transition_write
+            and self.filtered("blocked_by_member_withdrawal")
+        ):
+            raise ValidationError(
+                self.env._(
+                    "Un Beneficiario bloqueado por retiro del Socio titular "
+                    "no puede reactivarse directamente. Debe utilizarse el "
+                    "proceso controlado de reactivación del Socio."
+                )
+            )
+
+        skip_change_logging = internal_transition_write and self.env.context.get(
             "club_beneficiary_skip_change_logging"
         )
 
@@ -805,6 +856,14 @@ class ClubBeneficiary(models.Model):
             old_state = beneficiary.state
 
             prepared_vals = dict(vals)
+
+            if (
+                beneficiary.blocked_by_member_withdrawal
+                and "block_reason" in prepared_vals
+                and not internal_withdrawal_write
+                and not internal_transition_write
+            ):
+                prepared_vals["blocked_by_member_withdrawal"] = False
 
             if "relationship" in prepared_vals:
                 prepared_vals = self._prepare_relationship_values(prepared_vals)

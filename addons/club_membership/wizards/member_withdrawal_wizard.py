@@ -52,6 +52,17 @@ class ClubMemberWithdrawalWizard(models.TransientModel):
         readonly=True,
     )
 
+    withdrawal_cause = fields.Selection(
+        selection=[
+            ("voluntary", "Retiro / baja voluntaria"),
+            ("death", "Fallecimiento"),
+            ("administrative", "Otro motivo administrativo"),
+        ],
+        string="Causa de la baja",
+        required=True,
+        default="voluntary",
+    )
+
     effective_date = fields.Date(
         string="Fecha efectiva del retiro",
         required=True,
@@ -106,6 +117,7 @@ class ClubMemberWithdrawalWizard(models.TransientModel):
         self.member_id.action_withdraw_club_member(
             normalized_reason,
             effective_date=self.effective_date,
+            withdrawal_cause=self.withdrawal_cause,
         )
 
         return {

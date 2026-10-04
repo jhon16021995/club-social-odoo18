@@ -65,6 +65,14 @@
         />
     </record>
 
+    <record id="group_club_member_reactivation" model="res.groups">
+        <field name="name">Reactivar Socio Pasivo</field>
+        <field
+            name="category_id"
+            ref="club_membership.module_category_club_social"
+        />
+    </record>
+
     <!--
         Durante esta fase los administradores del sistema reciben
         automáticamente los permisos especiales de corrección.
@@ -90,6 +98,13 @@
                     ref(
                         'club_membership.'
                         'group_club_member_withdrawal'
+                    )
+                ),
+                (
+                    4,
+                    ref(
+                        'club_membership.'
+                        'group_club_member_reactivation'
                     )
                 )
             ]"

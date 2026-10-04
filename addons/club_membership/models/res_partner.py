@@ -310,6 +310,12 @@ class ResPartner(models.Model):
                 self.env._("No tiene permiso para retirar o dar de baja a un Socio.")
             )
 
+    def _is_club_member_state_internal_write(self):
+        return (
+            self.env.context.get("club_member_state_internal_token")
+            is _CLUB_MEMBER_STATE_INTERNAL_TOKEN
+        )
+
     def _write_club_member_values_internal(
         self,
         vals,
@@ -428,7 +434,7 @@ class ResPartner(models.Model):
         )
 
         if active_beneficiaries:
-            active_beneficiaries.write(
+            active_beneficiaries._write_member_withdrawal_values_internal(  # pylint: disable=protected-access
                 {
                     "state": "blocked",
                     "block_reason": self.env._(
@@ -437,21 +443,22 @@ class ResPartner(models.Model):
                         date=fields.Date.to_string(withdrawal_date),
                         reason=normalized_reason,
                     ),
+                    "blocked_by_member_withdrawal": True,
                 }
             )
 
         certificate = self.club_certificate_ids[:1]
 
         if certificate and certificate.state == "active":
-            certificate.with_context(
-                club_certificate_state_change_reason=self.env._(
-                    "Retiro del Socio titular. Motivo: %(reason)s",
-                    reason=normalized_reason,
-                )
-            ).write(
+            certificate._write_member_withdrawal_values_internal(  # pylint: disable=protected-access
                 {
                     "state": "passive",
-                }
+                    "passive_by_member_withdrawal": True,
+                },
+                reason=self.env._(
+                    "Retiro del Socio titular. Motivo: %(reason)s",
+                    reason=normalized_reason,
+                ),
             )
 
         kardex_reason = self.env._(
@@ -460,8 +467,12 @@ class ResPartner(models.Model):
             reason=normalized_reason,
         )
 
-        self._write_club_member_state_internal(
-            "inactive",
+        self._write_club_member_values_internal(
+            {
+                "club_member_state": "inactive",
+                "club_state_before_withdrawal": self.club_member_state,
+                "club_last_withdrawal_date": withdrawal_date,
+            },
             reason=kardex_reason,
             origin="manual",
             effective_date=withdrawal_date,
@@ -905,10 +916,7 @@ class ResPartner(models.Model):
         if not vals:
             return True
 
-        internal_member_state_write = (
-            self.env.context.get("club_member_state_internal_token")
-            is _CLUB_MEMBER_STATE_INTERNAL_TOKEN
-        )
+        internal_member_state_write = self._is_club_member_state_internal_write()
 
         if "club_member_state" in vals and not internal_member_state_write:
             requested_member_state = vals.get("club_member_state")

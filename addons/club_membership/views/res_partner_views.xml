@@ -117,6 +117,16 @@
                             or club_member_state == 'inactive'
                         "
                     />
+                    <button
+                        name="action_open_club_member_reactivation_wizard"
+                        type="object"
+                        string="Reactivar Socio"
+                        groups="club_membership.group_club_member_reactivation"
+                        invisible="
+                            club_person_type != 'member'
+                            or club_member_state != 'inactive'
+                        "
+                    />
                 </header>
 
                 <sheet>

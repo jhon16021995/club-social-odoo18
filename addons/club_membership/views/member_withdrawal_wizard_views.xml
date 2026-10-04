@@ -26,6 +26,7 @@
                 <separator string="Datos del retiro"/>
 
                 <group>
+                    <field name="withdrawal_cause"/>
                     <field name="effective_date"/>
                     <field
                         name="reason"

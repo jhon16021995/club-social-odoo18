@@ -1,12 +1,19 @@
 from odoo import fields, models
 from odoo.exceptions import ValidationError
 
+from .beneficiary import _CLUB_BENEFICIARY_TRANSITION_INTERNAL_TOKEN
+
 
 class ClubBeneficiaryTransition(models.Model):
     _inherit = "club.beneficiary"
 
     def write(self, vals):
-        if self.env.context.get("club_beneficiary_internal_transition_write"):
+        internal_transition_write = (
+            self.env.context.get("club_beneficiary_internal_transition_token")
+            is _CLUB_BENEFICIARY_TRANSITION_INTERNAL_TOKEN
+        )
+
+        if internal_transition_write:
             return super().write(vals)
 
         if {
@@ -91,12 +98,15 @@ class ClubBeneficiaryTransition(models.Model):
             "end_date": end_date,
             "end_reason": reason,
             "block_reason": False,
+            "blocked_by_member_withdrawal": False,
         }
 
         vals.update(dict(extra_vals or {}))
 
         self.with_context(
-            club_beneficiary_internal_transition_write=True,
+            club_beneficiary_internal_transition_token=(
+                _CLUB_BENEFICIARY_TRANSITION_INTERNAL_TOKEN
+            ),
             club_beneficiary_skip_change_logging=True,
         ).write(vals)
 
@@ -370,7 +380,9 @@ class ClubBeneficiaryTransition(models.Model):
             )
         else:
             self.with_context(
-                club_beneficiary_internal_transition_write=True,
+                club_beneficiary_internal_transition_token=(
+                    _CLUB_BENEFICIARY_TRANSITION_INTERNAL_TOKEN
+                ),
                 club_beneficiary_skip_change_logging=True,
             ).write(conversion_vals)
 

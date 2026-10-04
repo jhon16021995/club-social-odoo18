@@ -179,16 +179,31 @@ class TestMemberWithdrawal(TransactionCase):
             member.club_join_date,
             original_join_date,
         )
+        self.assertEqual(
+            member.club_state_before_withdrawal,
+            "active",
+        )
+        self.assertEqual(
+            member.club_last_withdrawal_date,
+            today,
+        )
+        self.assertEqual(
+            member.club_last_withdrawal_cause,
+            "voluntary",
+        )
 
         self.assertEqual(certificate.state, "passive")
+        self.assertTrue(certificate.passive_by_member_withdrawal)
 
         self.assertEqual(active_beneficiary.state, "blocked")
+        self.assertTrue(active_beneficiary.blocked_by_member_withdrawal)
         self.assertIn(
             reason,
             active_beneficiary.block_reason,
         )
 
         self.assertEqual(blocked_beneficiary.state, "blocked")
+        self.assertFalse(blocked_beneficiary.blocked_by_member_withdrawal)
         self.assertEqual(
             blocked_beneficiary.block_reason,
             previous_block_reason,
@@ -198,6 +213,7 @@ class TestMemberWithdrawal(TransactionCase):
             finalized_beneficiary.state,
             "finalized",
         )
+        self.assertFalse(finalized_beneficiary.blocked_by_member_withdrawal)
 
         member_event = self.Kardex.search(
             [
@@ -370,6 +386,18 @@ class TestMemberWithdrawal(TransactionCase):
         member.invalidate_recordset()
 
         self.assertEqual(member.club_member_state, "inactive")
+        self.assertEqual(
+            member.club_state_before_withdrawal,
+            "active",
+        )
+        self.assertEqual(
+            member.club_last_withdrawal_date,
+            today,
+        )
+        self.assertEqual(
+            member.club_last_withdrawal_cause,
+            "voluntary",
+        )
         self.assertEqual(action["res_model"], "res.partner")
         self.assertEqual(action["res_id"], member.id)
         self.assertEqual(action["target"], "current")
