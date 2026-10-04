@@ -14,32 +14,35 @@
             <form string="Gestionar vínculo de Beneficiario">
                 <field name="operation" invisible="1"/>
 
-                <group string="Vínculo actual">
+                <group string="Vínculo de origen">
                     <field name="person_id"/>
                     <field name="current_member_id"/>
                     <field name="current_relationship"/>
                 </group>
 
-                <group string="Finalización">
+                <group
+                    string="Finalización"
+                    invisible="operation == 'new_link'"
+                >
                     <field
                         name="end_date"
-                        required="1"
+                        required="operation != 'new_link'"
                     />
 
                     <field
                         name="reason"
-                        required="1"
+                        required="operation != 'new_link'"
                         placeholder="Explique el motivo de la operación..."
                     />
                 </group>
 
                 <group
                     string="Nuevo vínculo"
-                    invisible="operation != 'reassign'"
+                    invisible="operation == 'finalize'"
                 >
                     <field
                         name="new_member_id"
-                        required="operation == 'reassign'"
+                        required="operation != 'finalize'"
                         options="{
                             'no_create': True,
                             'no_open': True
@@ -48,26 +51,26 @@
 
                     <field
                         name="relationship"
-                        required="operation == 'reassign'"
+                        required="operation != 'finalize'"
                     />
 
                     <field
                         name="relationship_detail"
                         invisible="relationship != 'family_dependent'"
                         required="
-                            operation == 'reassign'
+                            operation != 'finalize'
                             and relationship == 'family_dependent'
                         "
                     />
 
                     <field
                         name="special_condition"
-                        required="operation == 'reassign'"
+                        required="operation != 'finalize'"
                     />
 
                     <field
                         name="start_date"
-                        required="operation == 'reassign'"
+                        required="operation != 'finalize'"
                     />
                 </group>
 
@@ -89,6 +92,14 @@
                     />
 
                     <button
+                        name="action_confirm"
+                        string="Crear nuevo vínculo"
+                        type="object"
+                        class="btn-primary"
+                        invisible="operation != 'new_link'"
+                    />
+
+                    <button
                         string="Cancelar"
                         special="cancel"
                         class="btn-secondary"
@@ -98,7 +109,7 @@
         </field>
     </record>
 
-    <!-- Botones en la ficha general del Beneficiario. -->
+    <!-- Acciones en la ficha general del Beneficiario. -->
 
     <record
         id="view_club_beneficiary_form_transition_actions"
@@ -134,11 +145,21 @@
                         ¿Desea continuar?
                     "
                 />
+
+                <button
+                    name="action_open_new_link_wizard"
+                    type="object"
+                    string="Crear nuevo vínculo"
+                    invisible="
+                        state != 'finalized'
+                        or converted_member_id
+                    "
+                />
             </xpath>
         </field>
     </record>
 
-    <!-- Botones cuando el Beneficiario se abre desde la ficha del Socio. -->
+    <!-- Acciones cuando se abre desde la ficha del Socio. -->
 
     <record
         id="view_partner_form_club_beneficiary_transition_actions"
@@ -161,6 +182,24 @@
                 position="before"
             >
                 <header>
+                    <field
+                        name="converted_member_id"
+                        invisible="1"
+                    />
+
+                    <button
+                        name="action_convert_to_member"
+                        type="object"
+                        string="Convertir en Socio"
+                        class="oe_highlight"
+                        invisible="converted_member_id"
+                        confirm="
+                            La persona será dada de alta como Socio
+                            reutilizando su identidad y carnet.
+                            ¿Desea continuar?
+                        "
+                    />
+
                     <button
                         name="action_open_reassign_wizard"
                         type="object"
@@ -176,6 +215,16 @@
                         confirm="
                             El vínculo actual quedará histórico.
                             ¿Desea continuar?
+                        "
+                    />
+
+                    <button
+                        name="action_open_new_link_wizard"
+                        type="object"
+                        string="Crear nuevo vínculo"
+                        invisible="
+                            state != 'finalized'
+                            or converted_member_id
                         "
                     />
                 </header>

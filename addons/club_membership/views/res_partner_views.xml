@@ -635,7 +635,12 @@
                         type="object"
                         string="Convertir en Socio"
                         class="oe_highlight"
-                        invisible="state == 'finalized'"
+                        invisible="converted_member_id"
+                        confirm="
+                            La persona será dada de alta como Socio
+                            reutilizando su identidad y carnet.
+                            ¿Desea continuar?
+                        "
                     />
                 </header>
 

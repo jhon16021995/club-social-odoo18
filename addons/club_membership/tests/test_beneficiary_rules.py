@@ -671,3 +671,319 @@ class TestBeneficiaryRules(TransactionCase):
         )
 
         self.assertFalse(generic_finalization_events)
+
+    def test_convert_blocked_beneficiary_to_member(self):
+        person = self._create_person(
+            "Beneficiario bloqueado convertido en Socio",
+            99200001300,
+            age=34,
+        )
+
+        original_carnet = person.club_id_number
+
+        beneficiary = self._create_beneficiary(
+            person,
+            relationship="partner",
+        )
+
+        beneficiary.write(
+            {
+                "state": "blocked",
+                "block_reason": "Bloqueo administrativo de prueba",
+            }
+        )
+
+        beneficiary.invalidate_recordset()
+
+        self.assertEqual(
+            beneficiary.state,
+            "blocked",
+        )
+
+        beneficiary.action_convert_to_member()
+
+        person.invalidate_recordset()
+        beneficiary.invalidate_recordset()
+
+        self.assertEqual(
+            person.club_person_type,
+            "member",
+        )
+        self.assertEqual(
+            person.club_member_code,
+            original_carnet,
+        )
+        self.assertEqual(
+            beneficiary.state,
+            "finalized",
+        )
+        self.assertEqual(
+            beneficiary.end_reason,
+            "Conversión a Socio",
+        )
+        self.assertFalse(
+            beneficiary.block_reason,
+        )
+        self.assertEqual(
+            beneficiary.converted_member_id,
+            person,
+        )
+
+    def test_convert_finalized_beneficiary_to_member_preserves_history(self):
+        person = self._create_person(
+            "Beneficiario histórico convertido en Socio",
+            99200001400,
+            age=36,
+        )
+
+        original_id = person.id
+        original_carnet = person.club_id_number
+
+        beneficiary = self._create_beneficiary(
+            person,
+            relationship="spouse",
+        )
+
+        today = fields.Date.context_today(beneficiary)
+        historical_reason = "Finalización histórica previa"
+
+        beneficiary.finalize_link(
+            end_date=today,
+            reason=historical_reason,
+        )
+
+        beneficiary.invalidate_recordset()
+
+        original_end_date = beneficiary.end_date
+        original_end_reason = beneficiary.end_reason
+
+        beneficiary.action_convert_to_member()
+
+        person.invalidate_recordset()
+        beneficiary.invalidate_recordset()
+
+        self.assertEqual(
+            person.id,
+            original_id,
+        )
+        self.assertEqual(
+            person.club_id_number,
+            original_carnet,
+        )
+        self.assertEqual(
+            person.club_person_type,
+            "member",
+        )
+        self.assertEqual(
+            person.club_member_code,
+            original_carnet,
+        )
+
+        self.assertEqual(
+            beneficiary.state,
+            "finalized",
+        )
+        self.assertEqual(
+            beneficiary.end_date,
+            original_end_date,
+        )
+        self.assertEqual(
+            beneficiary.end_reason,
+            original_end_reason,
+        )
+        self.assertEqual(
+            beneficiary.end_reason,
+            historical_reason,
+        )
+        self.assertEqual(
+            beneficiary.converted_member_id,
+            person,
+        )
+        self.assertTrue(
+            beneficiary.converted_at,
+        )
+
+        self.assertEqual(
+            self.Partner.search_count(
+                [
+                    (
+                        "club_id_number",
+                        "=",
+                        original_carnet,
+                    ),
+                ]
+            ),
+            1,
+        )
+
+    def test_finalized_beneficiary_can_create_new_link_reusing_person(self):
+        person = self._create_person(
+            "Beneficiario histórico con nuevo vínculo",
+            99200001500,
+            age=38,
+        )
+
+        original_carnet = person.club_id_number
+
+        beneficiary = self._create_beneficiary(
+            person,
+            relationship="spouse",
+        )
+
+        today = fields.Date.context_today(beneficiary)
+
+        beneficiary.finalize_link(
+            end_date=today,
+            reason="Cierre del vínculo anterior",
+        )
+
+        beneficiary.invalidate_recordset()
+
+        historical_state = beneficiary.state
+        historical_end_date = beneficiary.end_date
+        historical_end_reason = beneficiary.end_reason
+
+        new_member = self._create_member(
+            name="Nuevo Socio titular para vínculo histórico",
+            start_number=99200001600,
+        )
+
+        new_link = beneficiary.create_new_link(
+            {
+                "new_member_id": new_member.id,
+                "relationship": "partner",
+                "special_condition": "none",
+                "start_date": today,
+            }
+        )
+
+        beneficiary.invalidate_recordset()
+        person.invalidate_recordset()
+        new_link.invalidate_recordset()
+
+        self.assertNotEqual(
+            new_link.id,
+            beneficiary.id,
+        )
+        self.assertEqual(
+            new_link.person_id,
+            person,
+        )
+        self.assertEqual(
+            new_link.member_id,
+            new_member,
+        )
+        self.assertEqual(
+            new_link.relationship,
+            "partner",
+        )
+        self.assertEqual(
+            new_link.state,
+            "active",
+        )
+
+        self.assertEqual(
+            beneficiary.state,
+            historical_state,
+        )
+        self.assertEqual(
+            beneficiary.end_date,
+            historical_end_date,
+        )
+        self.assertEqual(
+            beneficiary.end_reason,
+            historical_end_reason,
+        )
+
+        self.assertEqual(
+            person.club_id_number,
+            original_carnet,
+        )
+        self.assertEqual(
+            self.Partner.search_count(
+                [
+                    (
+                        "club_id_number",
+                        "=",
+                        original_carnet,
+                    ),
+                ]
+            ),
+            1,
+        )
+
+        current_links = self.Beneficiary.search(
+            [
+                ("person_id", "=", person.id),
+                ("state", "in", ("active", "blocked")),
+            ]
+        )
+
+        self.assertEqual(
+            current_links,
+            new_link,
+        )
+
+    def test_new_link_is_blocked_when_person_already_has_current_link(self):
+        person = self._create_person(
+            "Beneficiario con vínculo vigente existente",
+            99200001700,
+            age=39,
+        )
+
+        historical_link = self._create_beneficiary(
+            person,
+            relationship="spouse",
+        )
+
+        today = fields.Date.context_today(historical_link)
+
+        historical_link.finalize_link(
+            end_date=today,
+            reason="Vínculo histórico finalizado",
+        )
+
+        current_member = self._create_member(
+            name="Socio titular del vínculo vigente",
+            start_number=99200001800,
+        )
+
+        current_link = self._create_beneficiary(
+            person,
+            relationship="partner",
+            member=current_member,
+        )
+
+        current_link.write(
+            {
+                "state": "blocked",
+                "block_reason": "Bloqueo administrativo de prueba",
+            }
+        )
+
+        another_member = self._create_member(
+            name="Otro Socio titular de prueba",
+            start_number=99200001900,
+        )
+
+        with self.assertRaises(ValidationError):
+            historical_link.create_new_link(
+                {
+                    "new_member_id": another_member.id,
+                    "relationship": "spouse",
+                    "special_condition": "none",
+                    "start_date": today,
+                }
+            )
+
+        historical_link.invalidate_recordset()
+        current_link.invalidate_recordset()
+
+        self.assertEqual(
+            historical_link.state,
+            "finalized",
+        )
+        self.assertEqual(
+            current_link.state,
+            "blocked",
+        )

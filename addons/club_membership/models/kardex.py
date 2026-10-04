@@ -102,6 +102,10 @@ class ClubKardexEvent(models.Model):
                 "Alta proveniente de beneficiario",
             ),
             (
+                "member_registration_error_corrected",
+                "Corrección de alta errónea de Socio",
+            ),
+            (
                 "certificate_created",
                 "Registro de certificado patrimonial",
             ),
