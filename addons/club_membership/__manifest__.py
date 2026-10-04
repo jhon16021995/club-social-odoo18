@@ -17,6 +17,7 @@
         "views/res_partner_views.xml",
         "views/person_identity_correction_wizard_views.xml",
         "views/member_registration_correction_wizard_views.xml",
+        "views/member_withdrawal_wizard_views.xml",
         "views/beneficiary_transition_wizard_views.xml",
         "views/certificate_views.xml",
         "views/kardex_views.xml",

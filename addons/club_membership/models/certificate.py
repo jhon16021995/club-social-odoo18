@@ -369,6 +369,10 @@ class ClubCertificate(models.Model):
 
         registration_error_void = certificate.state == "registration_error_void"
 
+        state_change_reason = self.env.context.get(
+            "club_certificate_state_change_reason"
+        )
+
         description = (
             self.env._("Certificado Patrimonial anulado por alta errónea.")
             if registration_error_void
@@ -384,7 +388,7 @@ class ClubCertificate(models.Model):
             reason=(
                 certificate.registration_error_reason
                 if registration_error_void
-                else False
+                else (state_change_reason or False)
             ),
             origin="manual",
         )

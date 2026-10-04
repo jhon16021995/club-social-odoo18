@@ -428,26 +428,26 @@ class TestBeneficiaryRules(TransactionCase):
         )
 
     def test_active_member_cannot_be_current_beneficiary_but_passive_can(self):
-        person_member = self._create_member(
-            name="Socio que será Beneficiario",
+        active_member = self._create_member(
+            name="Socio activo no puede ser Beneficiario",
             start_number=99200001000,
             state="active",
         )
 
         with self.assertRaises(ValidationError):
             self._create_beneficiary(
-                person_member,
+                active_member,
                 relationship="spouse",
             )
 
-        person_member.write(
-            {
-                "club_member_state": "inactive",
-            }
+        passive_member = self._create_member(
+            name="Socio Pasivo que puede ser Beneficiario",
+            start_number=99200001001,
+            state="inactive",
         )
 
         beneficiary = self._create_beneficiary(
-            person_member,
+            passive_member,
             relationship="spouse",
         )
 
@@ -457,7 +457,7 @@ class TestBeneficiaryRules(TransactionCase):
         )
         self.assertEqual(
             beneficiary.person_id,
-            person_member,
+            passive_member,
         )
         self.assertEqual(
             beneficiary.person_id.club_member_state,
@@ -465,7 +465,7 @@ class TestBeneficiaryRules(TransactionCase):
         )
 
         with self.assertRaises(ValidationError):
-            person_member.write(
+            passive_member.write(
                 {
                     "club_member_state": "active",
                 }
