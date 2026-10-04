@@ -91,8 +91,8 @@ class ClubBeneficiary(models.Model):
 
     relationship = fields.Selection(
         selection=[
-            ("spouse", "Cónyuge"),
-            ("partner", "Pareja"),
+            ("spouse", "Esposo(a)"),
+            ("partner", "Pareja de hecho"),
             ("child", "Hijo(a)"),
             ("stepchild", "Hijastro(a)"),
             ("parent", "Padre o madre"),
@@ -850,89 +850,6 @@ class ClubBeneficiary(models.Model):
             )
 
         return True
-
-    def action_convert_to_member(self):
-        self.ensure_one()
-
-        if self.state == "finalized":
-            raise ValidationError(
-                self.env._("Este vínculo de Beneficiario ya está finalizado.")
-            )
-
-        person = self.person_id
-
-        if person.club_person_type == "client":
-            raise ValidationError(
-                self.env._(
-                    "Esta persona todavía tiene la condición "
-                    "de Cliente. Debe finalizar primero esa "
-                    "condición antes de convertirse en Socio."
-                )
-            )
-
-        if person.club_person_type == "member":
-            raise ValidationError(
-                self.env._(
-                    "Esta persona ya posee historial como Socio. "
-                    "La reactivación de un Socio Pasivo se "
-                    "realizará mediante el proceso específico "
-                    "de reactivación."
-                )
-            )
-
-        original_member = self.member_id
-
-        person.with_context(club_conversion_beneficiary_id=self.id).write(
-            {
-                "club_person_type": "member",
-            }
-        )
-
-        self._write_finalized_transition(
-            fields.Date.context_today(self),
-            self.env._("Conversión a Socio"),
-            extra_vals={
-                "converted_member_id": person.id,
-                "converted_at": (fields.Datetime.now()),
-            },
-        )
-
-        self._log_kardex_event(
-            self,
-            "beneficiary_converted",
-            self.env._(
-                "Beneficiario %(name)s convertido en Socio.",
-                name=self.name,
-            ),
-            old_value=self.env._(
-                "Beneficiario de %(member)s",
-                member=original_member.display_name,
-            ),
-            new_value=self.env._(
-                "Socio %(member)s · Código %(code)s",
-                member=person.display_name,
-                code=person.club_member_code,
-            ),
-            reason=self.env._("Conversión a Socio"),
-            origin="manual",
-        )
-
-        return {
-            "type": "ir.actions.act_window",
-            "name": self.env._("Socio"),
-            "res_model": "res.partner",
-            "res_id": person.id,
-            "view_mode": "form",
-            "views": [
-                (
-                    self.env.ref(
-                        "club_membership.view_partner_form_club_membership"
-                    ).id,
-                    "form",
-                )
-            ],
-            "target": "current",
-        }
 
     @api.model
     def _cron_finalize_age_limit_beneficiaries(

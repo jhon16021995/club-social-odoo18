@@ -36,17 +36,44 @@
         />
     </record>
 
+    <!-- ============================================================
+         CORRECCIÓN DE ALTA ERRÓNEA DE SOCIO
+         ============================================================ -->
+
+    <record
+        id="group_club_member_registration_correction"
+        model="res.groups"
+    >
+        <field name="name">
+            Corregir alta errónea de Socio
+        </field>
+        <field
+            name="category_id"
+            ref="club_membership.module_category_club_social"
+        />
+    </record>
+
     <!--
-        Los administradores del sistema reciben automáticamente
-        autorización para corregir identidad.
+        Durante esta fase los administradores del sistema reciben
+        automáticamente los permisos especiales de corrección.
 
         Los perfiles funcionales definitivos del Club se configurarán
         posteriormente sin depender de base.group_user.
     -->
+
     <record id="base.group_system" model="res.groups">
         <field
             name="implied_ids"
-            eval="[(4, ref('club_membership.group_club_identity_correction'))]"
+            eval="[
+                (4, ref('club_membership.group_club_identity_correction')),
+                (
+                    4,
+                    ref(
+                        'club_membership.'
+                        'group_club_member_registration_correction'
+                    )
+                )
+            ]"
         />
     </record>
 </odoo>

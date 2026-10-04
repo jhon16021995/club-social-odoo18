@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record
+        id="view_club_member_registration_correction_wizard_form"
+        model="ir.ui.view"
+    >
+        <field name="name">club.member.registration.correction.wizard.form</field>
+        <field name="model">club.member.registration.correction.wizard</field>
+
+        <field name="arch" type="xml">
+            <form string="Corregir alta errónea de Socio">
+                <group string="Registro que será corregido">
+                    <field
+                        name="member_id"
+                        options="{
+                            'no_create': True,
+                            'no_open': True
+                        }"
+                    />
+
+                    <field name="id_number"/>
+                    <field name="member_code"/>
+                    <field name="current_member_state"/>
+
+                    <field
+                        name="certificate_id"
+                        options="{
+                            'no_create': True,
+                            'no_open': True
+                        }"
+                    />
+
+                    <field name="current_beneficiary_count"/>
+                </group>
+
+                <div
+                    class="alert alert-danger"
+                    role="alert"
+                    invisible="current_beneficiary_count == 0"
+                >
+                    Este Socio tiene Beneficiarios vigentes a su
+                    cargo. Debe finalizar manualmente todos esos
+                    vínculos antes de corregir el alta errónea.
+                    Los vínculos históricos ya finalizados no
+                    bloquean esta operación.
+                </div>
+
+                <div
+                    class="alert alert-warning"
+                    role="alert"
+                    invisible="current_beneficiary_count != 0"
+                >
+                    Este proceso debe utilizarse únicamente cuando
+                    una Persona fue registrada por error como Socio
+                    pero en realidad debía ser Beneficiario.
+
+                    La misma Persona y el mismo carnet serán conservados.
+                    El Certificado Patrimonial, si existe, no será
+                    eliminado: quedará Anulado por alta errónea.
+                </div>
+
+                <group string="Vínculo correcto como Beneficiario">
+                    <field
+                        name="target_member_id"
+                        required="1"
+                        options="{
+                            'no_create': True,
+                            'no_open': True
+                        }"
+                    />
+
+                    <field
+                        name="relationship"
+                        required="1"
+                    />
+
+                    <field
+                        name="relationship_detail"
+                        invisible="relationship != 'family_dependent'"
+                        required="relationship == 'family_dependent'"
+                    />
+
+                    <field
+                        name="special_condition"
+                        required="1"
+                    />
+
+                    <field
+                        name="start_date"
+                        required="1"
+                    />
+                </group>
+
+                <group string="Justificación">
+                    <field
+                        name="reason"
+                        required="1"
+                        placeholder="Explique claramente por qué el alta como Socio fue errónea..."
+                    />
+                </group>
+
+                <div class="alert alert-info" role="alert">
+                    La corrección quedará registrada con Persona,
+                    carnet, código anterior, estado anterior,
+                    Certificado relacionado, Socio titular correcto,
+                    Beneficiario resultante, usuario, fecha y motivo.
+                </div>
+
+                <footer>
+                    <button
+                        name="action_confirm"
+                        string="Aplicar corrección"
+                        type="object"
+                        class="btn-primary"
+                        invisible="current_beneficiary_count != 0"
+                        confirm="
+                            Esta operación retirará la condición actual
+                            de Socio y creará el vínculo correcto como
+                            Beneficiario. ¿Desea continuar?
+                        "
+                    />
+
+                    <button
+                        string="Cancelar"
+                        special="cancel"
+                        class="btn-secondary"
+                    />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record
+        id="action_club_member_registration_correction_wizard"
+        model="ir.actions.act_window"
+    >
+        <field name="name">Corregir alta errónea de Socio</field>
+        <field name="res_model">club.member.registration.correction.wizard</field>
+        <field name="view_mode">form</field>
+
+        <field
+            name="view_id"
+            ref="view_club_member_registration_correction_wizard_form"
+        />
+
+        <field name="target">new</field>
+    </record>
+
+    <record
+        id="view_partner_form_club_member_registration_correction"
+        model="ir.ui.view"
+    >
+        <field name="name">res.partner.form.club.member.registration.correction</field>
+        <field name="model">res.partner</field>
+
+        <field
+            name="inherit_id"
+            ref="view_partner_form_club_identity_correction"
+        />
+
+        <field name="arch" type="xml">
+            <xpath
+                expr="//form/header"
+                position="inside"
+            >
+                <button
+                    name="%(action_club_member_registration_correction_wizard)d"
+                    type="action"
+                    string="Corregir alta errónea de Socio"
+                    groups="club_membership.group_club_member_registration_correction"
+                    context="{
+                        'default_member_id': id
+                    }"
+                    invisible="
+                        not id
+                        or club_person_type != 'member'
+                    "
+                />
+            </xpath>
+        </field>
+    </record>
+</odoo>

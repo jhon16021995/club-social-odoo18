@@ -1,3 +1,7 @@
+# Esta extensión de res.partner se mantiene separada intencionalmente
+# para encapsular la corrección sensible y auditoría de identidad.
+# pylint: disable=consider-merging-classes-inherited
+
 from odoo import fields, models
 from odoo.exceptions import AccessError, ValidationError
 

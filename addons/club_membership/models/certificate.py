@@ -1,6 +1,8 @@
 from odoo import api, fields, models
-from odoo.exceptions import ValidationError
+from odoo.exceptions import AccessError, ValidationError
 from odoo.tools import float_is_zero
+
+_REGISTRATION_ERROR_VOID_TOKEN = object()
 
 
 class ClubCertificate(models.Model):
@@ -29,7 +31,7 @@ class ClubCertificate(models.Model):
 
     certificate_number = fields.Char(
         string="Número de certificado",
-        related="member_id.club_member_code",
+        related="member_id.club_id_number",
         store=True,
         readonly=True,
     )
@@ -92,6 +94,10 @@ class ClubCertificate(models.Model):
             ("active", "Activo"),
             ("transferred", "Transferido"),
             ("passive", "Pasivo"),
+            (
+                "registration_error_void",
+                "Anulado por alta errónea",
+            ),
         ],
         string="Estado",
         required=True,
@@ -99,8 +105,31 @@ class ClubCertificate(models.Model):
         help=(
             "Activo: certificado vigente. "
             "Transferido: certificado transferido a un familiar. "
-            "Pasivo: certificado inhabilitado."
+            "Pasivo: certificado inhabilitado. "
+            "Anulado por alta errónea: certificado conservado "
+            "históricamente porque la Persona fue registrada "
+            "incorrectamente como Socio."
         ),
+    )
+
+    registration_error_reason = fields.Text(
+        string="Motivo de anulación por alta errónea",
+        readonly=True,
+        copy=False,
+    )
+
+    registration_error_at = fields.Datetime(
+        string="Fecha de anulación por alta errónea",
+        readonly=True,
+        copy=False,
+    )
+
+    registration_error_user_id = fields.Many2one(
+        comodel_name="res.users",
+        string="Usuario que anuló por alta errónea",
+        readonly=True,
+        copy=False,
+        ondelete="restrict",
     )
 
     issue_date = fields.Date(
@@ -338,12 +367,25 @@ class ClubCertificate(models.Model):
         if old_state == new_state:
             return
 
+        registration_error_void = certificate.state == "registration_error_void"
+
+        description = (
+            self.env._("Certificado Patrimonial anulado por alta errónea.")
+            if registration_error_void
+            else self.env._("Estado del Certificado Patrimonial actualizado.")
+        )
+
         self._log_kardex_event(
             certificate,
             "certificate_state_changed",
-            self.env._("Estado del Certificado Patrimonial actualizado."),
+            description,
             old_value=old_state,
             new_value=new_state,
+            reason=(
+                certificate.registration_error_reason
+                if registration_error_void
+                else False
+            ),
             origin="manual",
         )
 
@@ -369,8 +411,101 @@ class ClubCertificate(models.Model):
 
         return certificates
 
+    def _action_void_registration_error(self, reason):
+        self.ensure_one()
+
+        if not self.env.user.has_group(
+            "club_membership.group_club_member_registration_correction"
+        ):
+            raise AccessError(
+                self.env._(
+                    "No tiene permiso para anular un Certificado "
+                    "por alta errónea de Socio."
+                )
+            )
+
+        normalized_reason = (reason or "").strip()
+
+        if not normalized_reason:
+            raise ValidationError(
+                self.env._("Debe indicar el motivo de la anulación por alta errónea.")
+            )
+
+        if self.state == "registration_error_void":
+            raise ValidationError(
+                self.env._("Este Certificado ya fue anulado por alta errónea.")
+            )
+
+        if self.member_id.club_person_type != "member":
+            raise ValidationError(
+                self.env._(
+                    "La anulación por alta errónea debe realizarse "
+                    "mientras la Persona todavía conserva "
+                    "la condición de Socio."
+                )
+            )
+
+        self.with_context(
+            club_certificate_registration_error_void_token=(
+                _REGISTRATION_ERROR_VOID_TOKEN
+            )
+        ).write(
+            {
+                "state": "registration_error_void",
+                "registration_error_reason": normalized_reason,
+                "registration_error_at": fields.Datetime.now(),
+                "registration_error_user_id": self.env.user.id,
+            }
+        )
+
+        return True
+
     def write(self, vals):
         vals = dict(vals)
+
+        internal_registration_error_void = (
+            self.env.context.get("club_certificate_registration_error_void_token")
+            is _REGISTRATION_ERROR_VOID_TOKEN
+        )
+
+        protected_registration_error_fields = {
+            "registration_error_reason",
+            "registration_error_at",
+            "registration_error_user_id",
+        }
+
+        if (
+            protected_registration_error_fields.intersection(vals)
+            and not internal_registration_error_void
+        ):
+            raise AccessError(
+                self.env._(
+                    "Los datos de anulación por alta errónea "
+                    "solo pueden ser modificados por el proceso "
+                    "autorizado del sistema."
+                )
+            )
+
+        if (
+            vals.get("state") == "registration_error_void"
+            and not internal_registration_error_void
+        ):
+            raise AccessError(
+                self.env._(
+                    "El estado Anulado por alta errónea "
+                    "solo puede establecerse mediante "
+                    "el proceso de corrección autorizado."
+                )
+            )
+
+        for certificate in self:
+            if certificate.state == "registration_error_void":
+                raise ValidationError(
+                    self.env._(
+                        "Un Certificado anulado por alta errónea "
+                        "es histórico y no puede modificarse."
+                    )
+                )
 
         if "member_id" in vals:
             for certificate in self:

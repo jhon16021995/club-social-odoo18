@@ -18,6 +18,7 @@ class ClubBeneficiaryTransitionWizard(models.TransientModel):
         selection=[
             ("finalize", "Finalizar vínculo"),
             ("reassign", "Reasignar / cambiar vínculo"),
+            ("new_link", "Crear nuevo vínculo"),
         ],
         string="Operación",
         required=True,
@@ -44,13 +45,11 @@ class ClubBeneficiaryTransitionWizard(models.TransientModel):
 
     end_date = fields.Date(
         string="Fecha de finalización",
-        required=True,
         default=fields.Date.context_today,
     )
 
     reason = fields.Text(
         string="Motivo",
-        required=True,
     )
 
     new_member_id = fields.Many2one(
@@ -61,8 +60,8 @@ class ClubBeneficiaryTransitionWizard(models.TransientModel):
 
     relationship = fields.Selection(
         selection=[
-            ("spouse", "Cónyuge"),
-            ("partner", "Pareja"),
+            ("spouse", "Esposo(a)"),
+            ("partner", "Pareja de hecho"),
             ("child", "Hijo(a)"),
             ("stepchild", "Hijastro(a)"),
             ("parent", "Padre o madre"),
@@ -96,27 +95,8 @@ class ClubBeneficiaryTransitionWizard(models.TransientModel):
         default=fields.Date.context_today,
     )
 
-    def action_confirm(self):
+    def _validate_new_link_fields(self):
         self.ensure_one()
-
-        if not self.beneficiary_id:
-            raise ValidationError(
-                self.env._("No se encontró el vínculo de Beneficiario.")
-            )
-
-        if self.operation == "finalize":
-            self.beneficiary_id.finalize_link(
-                end_date=self.end_date,
-                reason=self.reason,
-            )
-
-            return {
-                "type": "ir.actions.client",
-                "tag": "reload",
-            }
-
-        if self.operation != "reassign":
-            raise ValidationError(self.env._("La operación solicitada no es válida."))
 
         if not self.new_member_id:
             raise ValidationError(
@@ -145,23 +125,14 @@ class ClubBeneficiaryTransitionWizard(models.TransientModel):
         if self.relationship != "family_dependent":
             relationship_detail = False
 
-        new_link = self.beneficiary_id.reassign_link(
-            {
-                "new_member_id": self.new_member_id.id,
-                "relationship": self.relationship,
-                "relationship_detail": relationship_detail,
-                "special_condition": (self.special_condition or "none"),
-                "end_date": self.end_date,
-                "start_date": self.start_date,
-                "reason": self.reason,
-            }
-        )
+        return relationship_detail
 
+    def _open_beneficiary(self, beneficiary):
         return {
             "type": "ir.actions.act_window",
             "name": self.env._("Beneficiario"),
             "res_model": "club.beneficiary",
-            "res_id": new_link.id,
+            "res_id": beneficiary.id,
             "view_mode": "form",
             "views": [
                 (
@@ -171,3 +142,59 @@ class ClubBeneficiaryTransitionWizard(models.TransientModel):
             ],
             "target": "current",
         }
+
+    def action_confirm(self):
+        self.ensure_one()
+
+        if not self.beneficiary_id:
+            raise ValidationError(
+                self.env._("No se encontró el vínculo de Beneficiario.")
+            )
+
+        if self.operation == "finalize":
+            if not self.end_date:
+                raise ValidationError(
+                    self.env._("Debe indicar la fecha de finalización.")
+                )
+
+            self.beneficiary_id.finalize_link(
+                end_date=self.end_date,
+                reason=self.reason,
+            )
+
+            return {
+                "type": "ir.actions.client",
+                "tag": "reload",
+            }
+
+        if self.operation not in ("reassign", "new_link"):
+            raise ValidationError(self.env._("La operación solicitada no es válida."))
+
+        relationship_detail = self._validate_new_link_fields()
+
+        values = {
+            "new_member_id": self.new_member_id.id,
+            "relationship": self.relationship,
+            "relationship_detail": relationship_detail,
+            "special_condition": self.special_condition or "none",
+            "start_date": self.start_date,
+        }
+
+        if self.operation == "reassign":
+            if not self.end_date:
+                raise ValidationError(
+                    self.env._("Debe indicar la fecha de finalización.")
+                )
+
+            values.update(
+                {
+                    "end_date": self.end_date,
+                    "reason": self.reason,
+                }
+            )
+
+            new_link = self.beneficiary_id.reassign_link(values)
+        else:
+            new_link = self.beneficiary_id.create_new_link(values)
+
+        return self._open_beneficiary(new_link)
