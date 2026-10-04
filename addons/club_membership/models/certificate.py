@@ -3,6 +3,7 @@ from odoo.exceptions import AccessError, ValidationError
 from odoo.tools import float_is_zero
 
 _REGISTRATION_ERROR_VOID_TOKEN = object()
+_CERTIFICATE_MEMBER_WITHDRAWAL_INTERNAL_TOKEN = object()
 
 
 class ClubCertificate(models.Model):
@@ -110,6 +111,13 @@ class ClubCertificate(models.Model):
             "históricamente porque la Persona fue registrada "
             "incorrectamente como Socio."
         ),
+    )
+
+    passive_by_member_withdrawal = fields.Boolean(
+        string="Pasivo por retiro del Socio titular",
+        readonly=True,
+        copy=False,
+        index=True,
     )
 
     registration_error_reason = fields.Text(
@@ -369,6 +377,10 @@ class ClubCertificate(models.Model):
 
         registration_error_void = certificate.state == "registration_error_void"
 
+        state_change_reason = self.env.context.get(
+            "club_certificate_state_change_reason"
+        )
+
         description = (
             self.env._("Certificado Patrimonial anulado por alta errónea.")
             if registration_error_void
@@ -384,7 +396,7 @@ class ClubCertificate(models.Model):
             reason=(
                 certificate.registration_error_reason
                 if registration_error_void
-                else False
+                else (state_change_reason or False)
             ),
             origin="manual",
         )
@@ -460,8 +472,62 @@ class ClubCertificate(models.Model):
 
         return True
 
+    def _write_member_withdrawal_values_internal(
+        self,
+        vals,
+        *,
+        reason=False,
+    ):
+        return self.with_context(
+            club_certificate_member_withdrawal_internal_token=(
+                _CERTIFICATE_MEMBER_WITHDRAWAL_INTERNAL_TOKEN
+            ),
+            club_certificate_state_change_reason=reason or False,
+        ).write(vals)
+
+    def _check_member_withdrawal_write(
+        self,
+        vals,
+        *,
+        internal_member_withdrawal_write,
+        internal_registration_error_void,
+    ):
+        if (
+            "passive_by_member_withdrawal" in vals
+            and not internal_member_withdrawal_write
+        ):
+            raise AccessError(
+                self.env._(
+                    "La marca técnica de Certificado Pasivo por retiro "
+                    "solo puede modificarse mediante un proceso "
+                    "controlado del sistema."
+                )
+            )
+
+        protected_state_change = (
+            "state" in vals
+            and vals.get("state") != "passive"
+            and not internal_member_withdrawal_write
+            and not internal_registration_error_void
+        )
+
+        if protected_state_change and self.filtered("passive_by_member_withdrawal"):
+            raise ValidationError(
+                self.env._(
+                    "Un Certificado que quedó Pasivo por retiro del Socio "
+                    "no puede reactivarse o cambiar de estado directamente. "
+                    "Debe utilizarse el proceso controlado de reactivación "
+                    "del Socio."
+                )
+            )
+
     def write(self, vals):
         vals = dict(vals)
+
+        internal_member_withdrawal_write = (
+            self.env.context.get("club_certificate_member_withdrawal_internal_token")
+            is _CERTIFICATE_MEMBER_WITHDRAWAL_INTERNAL_TOKEN
+        )
 
         internal_registration_error_void = (
             self.env.context.get("club_certificate_registration_error_void_token")
@@ -473,6 +539,12 @@ class ClubCertificate(models.Model):
             "registration_error_at",
             "registration_error_user_id",
         }
+
+        self._check_member_withdrawal_write(
+            vals,
+            internal_member_withdrawal_write=internal_member_withdrawal_write,
+            internal_registration_error_void=internal_registration_error_void,
+        )
 
         if (
             protected_registration_error_fields.intersection(vals)

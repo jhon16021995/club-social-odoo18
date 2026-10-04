@@ -1,5 +1,7 @@
 from odoo import api, fields, models
-from odoo.exceptions import ValidationError
+from odoo.exceptions import AccessError, ValidationError
+
+_CLUB_MEMBER_STATE_INTERNAL_TOKEN = object()
 
 
 class ResPartner(models.Model):
@@ -302,6 +304,182 @@ class ResPartner(models.Model):
                     )
                 )
 
+    def _check_club_member_withdrawal_permission(self):
+        if not self.env.user.has_group("club_membership.group_club_member_withdrawal"):
+            raise AccessError(
+                self.env._("No tiene permiso para retirar o dar de baja a un Socio.")
+            )
+
+    def _is_club_member_state_internal_write(self):
+        return (
+            self.env.context.get("club_member_state_internal_token")
+            is _CLUB_MEMBER_STATE_INTERNAL_TOKEN
+        )
+
+    def _write_club_member_values_internal(
+        self,
+        vals,
+        *,
+        reason=False,
+        origin="manual",
+        effective_date=False,
+    ):
+        context_values = {
+            "club_member_state_internal_token": (_CLUB_MEMBER_STATE_INTERNAL_TOKEN),
+            "club_member_state_change_reason": reason or False,
+            "club_member_state_change_origin": origin,
+            "club_member_state_change_effective_date": (
+                fields.Date.to_string(effective_date) if effective_date else False
+            ),
+        }
+
+        return self.with_context(**context_values).write(vals)
+
+    def _write_club_member_state_internal(
+        self,
+        new_state,
+        *,
+        reason=False,
+        origin="manual",
+        effective_date=False,
+    ):
+        self.ensure_one()
+
+        return self._write_club_member_values_internal(
+            {
+                "club_member_state": new_state,
+            },
+            reason=reason,
+            origin=origin,
+            effective_date=effective_date,
+        )
+
+    def action_open_club_member_withdrawal_wizard(self):
+        self.ensure_one()
+        self._check_club_member_withdrawal_permission()
+
+        if self.club_person_type != "member":
+            raise ValidationError(
+                self.env._("La acción de retiro solo puede aplicarse a un Socio.")
+            )
+
+        if self.club_member_state == "inactive":
+            raise ValidationError(
+                self.env._("El Socio ya se encuentra en estado Pasivo.")
+            )
+
+        return {
+            "type": "ir.actions.act_window",
+            "name": self.env._("Retirar / dar de baja Socio"),
+            "res_model": "club.member.withdrawal.wizard",
+            "view_mode": "form",
+            "views": [
+                (
+                    self.env.ref(
+                        "club_membership.view_club_member_withdrawal_wizard_form"
+                    ).id,
+                    "form",
+                )
+            ],
+            "target": "new",
+            "context": {
+                "default_member_id": self.id,
+            },
+        }
+
+    def action_withdraw_club_member(
+        self,
+        reason,
+        effective_date=False,
+    ):
+        self.ensure_one()
+        self._check_club_member_withdrawal_permission()
+
+        if self.club_person_type != "member":
+            raise ValidationError(
+                self.env._("La acción de retiro solo puede aplicarse a un Socio.")
+            )
+
+        if self.club_member_state == "inactive":
+            raise ValidationError(
+                self.env._("El Socio ya se encuentra en estado Pasivo.")
+            )
+
+        normalized_reason = (reason or "").strip()
+        if not normalized_reason:
+            raise ValidationError(
+                self.env._("Debe indicar el motivo del retiro del Socio.")
+            )
+
+        today = fields.Date.context_today(self)
+        withdrawal_date = (
+            fields.Date.to_date(effective_date) if effective_date else today
+        )
+
+        if withdrawal_date > today:
+            raise ValidationError(
+                self.env._("La fecha efectiva del retiro no puede ser futura.")
+            )
+
+        if self.club_join_date and withdrawal_date < self.club_join_date:
+            raise ValidationError(
+                self.env._(
+                    "La fecha efectiva del retiro no puede ser "
+                    "anterior a la fecha de ingreso del Socio."
+                )
+            )
+
+        active_beneficiaries = self.club_beneficiary_ids.filtered(
+            lambda beneficiary: beneficiary.state == "active"
+        )
+
+        if active_beneficiaries:
+            active_beneficiaries._write_member_withdrawal_values_internal(  # pylint: disable=protected-access
+                {
+                    "state": "blocked",
+                    "block_reason": self.env._(
+                        "Socio titular retirado del Club con fecha "
+                        "efectiva %(date)s. Motivo: %(reason)s",
+                        date=fields.Date.to_string(withdrawal_date),
+                        reason=normalized_reason,
+                    ),
+                    "blocked_by_member_withdrawal": True,
+                }
+            )
+
+        certificate = self.club_certificate_ids[:1]
+
+        if certificate and certificate.state == "active":
+            certificate._write_member_withdrawal_values_internal(  # pylint: disable=protected-access
+                {
+                    "state": "passive",
+                    "passive_by_member_withdrawal": True,
+                },
+                reason=self.env._(
+                    "Retiro del Socio titular. Motivo: %(reason)s",
+                    reason=normalized_reason,
+                ),
+            )
+
+        kardex_reason = self.env._(
+            "Fecha efectiva: %(date)s\nMotivo: %(reason)s",
+            date=fields.Date.to_string(withdrawal_date),
+            reason=normalized_reason,
+        )
+
+        self._write_club_member_values_internal(
+            {
+                "club_member_state": "inactive",
+                "club_state_before_withdrawal": self.club_member_state,
+                "club_last_withdrawal_date": withdrawal_date,
+            },
+            reason=kardex_reason,
+            origin="manual",
+            effective_date=withdrawal_date,
+        )
+
+        return True
+
     def _build_club_member_code(self, id_number):
         if not id_number:
             return False
@@ -496,6 +674,7 @@ class ResPartner(models.Model):
             *self._CLUB_KARDEX_IDENTITY_FIELDS,
             "club_member_code",
             "club_join_date",
+            "club_member_state",
         )
 
         return {
@@ -673,6 +852,40 @@ class ResPartner(models.Model):
                 origin="manual",
             )
 
+        old_member_state = before_values["club_member_state"]
+
+        new_member_state = self._format_club_kardex_value(
+            partner,
+            "club_member_state",
+        )
+
+        if old_member_state != new_member_state:
+            effective_date = self.env.context.get(
+                "club_member_state_change_effective_date"
+            )
+
+            description = self.env._("Estado del asociado actualizado.")
+
+            if partner.club_member_state == "inactive" and effective_date:
+                description = self.env._(
+                    "Socio retirado del Club con fecha efectiva %(date)s.",
+                    date=effective_date,
+                )
+
+            self._log_club_kardex_event(
+                partner,
+                "member_state_changed",
+                description,
+                old_value=old_member_state,
+                new_value=new_member_state,
+                reason=(
+                    self.env.context.get("club_member_state_change_reason") or False
+                ),
+                origin=(
+                    self.env.context.get("club_member_state_change_origin") or "manual"
+                ),
+            )
+
     @api.model_create_multi
     def create(self, vals_list):
         batch_member_codes = set()
@@ -703,6 +916,38 @@ class ResPartner(models.Model):
         if not vals:
             return True
 
+        internal_member_state_write = self._is_club_member_state_internal_write()
+
+        if "club_member_state" in vals and not internal_member_state_write:
+            requested_member_state = vals.get("club_member_state")
+
+            for partner in self:
+                if partner.club_person_type != "member":
+                    continue
+
+                if (
+                    requested_member_state == "inactive"
+                    and partner.club_member_state != "inactive"
+                ):
+                    raise ValidationError(
+                        self.env._(
+                            "Para pasar un Socio a Pasivo debe utilizar "
+                            "la acción controlada Retirar / dar de baja Socio."
+                        )
+                    )
+
+                if (
+                    partner.club_member_state == "inactive"
+                    and requested_member_state != "inactive"
+                ):
+                    raise ValidationError(
+                        self.env._(
+                            "Un Socio Pasivo no puede reactivarse "
+                            "mediante edición directa. La reactivación "
+                            "requiere un proceso controlado específico."
+                        )
+                    )
+
         code_fields = {
             "club_person_type",
             "club_id_number",
@@ -713,6 +958,7 @@ class ResPartner(models.Model):
             *self._CLUB_KARDEX_IDENTITY_FIELDS,
             "club_person_type",
             "club_join_date",
+            "club_member_state",
         }
 
         if not (code_fields | tracked_fields).intersection(vals):

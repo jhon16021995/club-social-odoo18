@@ -7,6 +7,7 @@ from . import (
     person_audit,
     res_partner,
     res_partner_identity,
+    res_partner_member_reactivation,
 )
 
 # Este import debe ejecutarse después de las extensiones principales

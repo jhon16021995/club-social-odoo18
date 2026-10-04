@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_club_member_reactivation_wizard_form" model="ir.ui.view">
+        <field name="name">club.member.reactivation.wizard.form</field>
+        <field name="model">club.member.reactivation.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Reactivar Socio Pasivo">
+                <group>
+                    <group string="Socio">
+                        <field name="member_id"/>
+                        <field name="member_code"/>
+                        <field name="current_member_state"/>
+                        <field name="restore_member_state"/>
+                        <field name="last_withdrawal_date"/>
+                        <field name="last_withdrawal_cause"/>
+                    </group>
+
+                    <group string="Impacto de la reactivación">
+                        <field name="certificate_id"/>
+                        <field
+                            name="certificate_state"
+                            invisible="not certificate_id"
+                        />
+                        <field
+                            name="certificate_will_reactivate"
+                            invisible="not certificate_id"
+                        />
+                        <field name="eligible_beneficiary_count"/>
+                        <field
+                            name="preserved_blocked_beneficiary_count"
+                        />
+                    </group>
+                </group>
+
+                <separator string="Datos de la reactivación"/>
+
+                <group>
+                    <field name="effective_date"/>
+                    <field
+                        name="reason"
+                        placeholder="Indique el motivo administrativo de la reactivación..."
+                    />
+                </group>
+
+                <div class="alert alert-info" role="alert">
+                    <strong>Esta operación conserva todo el historial.</strong>
+                    El Socio recuperará el estado que tenía antes de su último
+                    retiro. Solo se reactivarán el Certificado y los
+                    Beneficiarios que fueron inhabilitados específicamente
+                    por ese retiro. Los vínculos finalizados, reasignados o
+                    bloqueados por otra causa no serán modificados.
+                </div>
+
+                <footer>
+                    <button
+                        name="action_confirm"
+                        type="object"
+                        string="Confirmar reactivación"
+                        class="btn-primary"
+                        confirm="¿Confirma la reactivación del Socio?"
+                    />
+                    <button
+                        string="Cancelar"
+                        special="cancel"
+                        class="btn-secondary"
+                    />
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

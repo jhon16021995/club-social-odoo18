@@ -348,11 +348,19 @@ class ResPartnerMemberRegistrationCorrection(models.Model):
             )
 
         if self.club_member_state != "inactive":
-            self.write(
-                {
-                    "club_member_state": "inactive",
-                }
+            # El helper protegido se comparte intencionalmente entre
+            # extensiones controladas del mismo modelo res.partner.
+            # pylint: disable=protected-access
+            self.with_context(
+                club_member_registration_correction_token=(
+                    _MEMBER_REGISTRATION_CORRECTION_TOKEN
+                )
+            )._write_club_member_state_internal(
+                "inactive",
+                reason=normalized_reason,
+                origin="manual",
             )
+            # pylint: enable=protected-access
 
         beneficiary = self.env["club.beneficiary"].create(
             {
@@ -385,11 +393,14 @@ class ResPartnerMemberRegistrationCorrection(models.Model):
             reason=normalized_reason,
         )
 
+        # El helper protegido se comparte intencionalmente entre
+        # extensiones controladas del mismo modelo res.partner.
+        # pylint: disable=protected-access
         self.with_context(
             club_member_registration_correction_token=(
                 _MEMBER_REGISTRATION_CORRECTION_TOKEN
             )
-        ).write(
+        )._write_club_member_values_internal(
             {
                 "club_person_type": False,
                 "club_member_state": False,
@@ -397,5 +408,6 @@ class ResPartnerMemberRegistrationCorrection(models.Model):
                 "club_join_date": False,
             }
         )
+        # pylint: enable=protected-access
 
         return beneficiary, correction
