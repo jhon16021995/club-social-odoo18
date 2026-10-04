@@ -3,7 +3,9 @@ from odoo.exceptions import ValidationError
 
 
 class ResPartner(models.Model):
-    _inherit = "res.partner"
+    # This extension intentionally remains separate from the member
+    # registration correction process because that layer must load last.
+    _inherit = "res.partner"  # pylint: disable=consider-merging-classes-inherited
 
     _sql_constraints = [
         (

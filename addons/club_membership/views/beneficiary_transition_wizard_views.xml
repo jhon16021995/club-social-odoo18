@@ -129,6 +129,17 @@
         <field name="arch" type="xml">
             <xpath expr="//header" position="inside">
                 <button
+                    name="%(action_club_person_identity_correction_wizard)d"
+                    type="action"
+                    string="Corregir identidad"
+                    groups="club_membership.group_club_identity_correction"
+                    context="{
+                        'default_person_id': person_id
+                    }"
+                    invisible="not person_id"
+                />
+
+                <button
                     name="action_open_reassign_wizard"
                     type="object"
                     string="Reasignar / cambiar vínculo"
@@ -185,6 +196,17 @@
                     <field
                         name="converted_member_id"
                         invisible="1"
+                    />
+
+                    <button
+                        name="%(action_club_person_identity_correction_wizard)d"
+                        type="action"
+                        string="Corregir identidad"
+                        groups="club_membership.group_club_identity_correction"
+                        context="{
+                            'default_person_id': person_id
+                        }"
+                        invisible="not person_id"
                     />
 
                     <button
