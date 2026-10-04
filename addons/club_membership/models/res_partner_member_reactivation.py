@@ -3,7 +3,9 @@ from odoo.exceptions import AccessError, ValidationError
 
 
 class ResPartnerMemberReactivation(models.Model):
-    _inherit = "res.partner"
+    # This extension intentionally remains separate because member
+    # reactivation is an isolated controlled workflow.
+    _inherit = "res.partner"  # pylint: disable=consider-merging-classes-inherited
 
     club_state_before_withdrawal = fields.Selection(
         selection=[
@@ -203,6 +205,23 @@ class ResPartnerMemberReactivation(models.Model):
                     "No se conoce el estado que tenía el Socio antes "
                     "del último retiro. Debe regularizarse su historial "
                     "antes de reactivarlo."
+                )
+            )
+
+        current_beneficiary_link = self.env["club.beneficiary"].search(
+            [
+                ("person_id", "=", self.id),
+                ("state", "in", ("active", "blocked")),
+            ],
+            limit=1,
+        )
+
+        if current_beneficiary_link:
+            raise ValidationError(
+                self.env._(
+                    "Un Socio con un vínculo vigente como Beneficiario "
+                    "debe permanecer Pasivo. Finalice primero el vínculo "
+                    "de Beneficiario antes de reactivar al Socio."
                 )
             )
 
