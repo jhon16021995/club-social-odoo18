@@ -100,6 +100,20 @@ class ResPartnerMemberReentry(models.Model):
         self.ensure_one()
         self._check_club_member_reentry_permission()
 
+        return self._execute_club_member_reentry(
+            reason,
+            effective_date=effective_date,
+        )
+
+    def _execute_club_member_reentry(
+        self,
+        reason,
+        effective_date=False,
+        *,
+        allow_client_role=False,
+    ):
+        self.ensure_one()
+
         normalized_reason = (reason or "").strip()
 
         if not normalized_reason:
@@ -121,7 +135,9 @@ class ResPartnerMemberReentry(models.Model):
                 self.env._("La fecha efectiva del Reingreso no puede ser futura.")
             )
 
-        if self.club_person_type:
+        if self.club_person_type and not (
+            allow_client_role and self.club_person_type == "client"
+        ):
             raise ValidationError(
                 self.env._(
                     "El Reingreso como Socio solo puede aplicarse a un Ex-Socio "

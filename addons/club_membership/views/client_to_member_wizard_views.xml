@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record
+        id="view_club_client_to_member_wizard_form"
+        model="ir.ui.view"
+    >
+        <field name="name">club.client.to.member.wizard.form</field>
+        <field name="model">club.client.to.member.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Convertir Cliente en Socio">
+                <field name="is_reentry" invisible="1"/>
+
+                <group>
+                    <group string="Cliente">
+                        <field name="person_id"/>
+                        <field
+                            name="last_membership_end_date"
+                            invisible="not is_reentry"
+                        />
+                    </group>
+                </group>
+
+                <div
+                    class="alert alert-info"
+                    role="alert"
+                    invisible="is_reentry"
+                >
+                    Esta Persona no posee una membresía finalizada.
+                    La conversión generará su primer período de membresía
+                    como alta inicial.
+                </div>
+
+                <div
+                    class="alert alert-info"
+                    role="alert"
+                    invisible="not is_reentry"
+                >
+                    <strong>
+                        Esta Persona posee historial de membresía finalizado.
+                    </strong>
+                    La conversión conservará ese historial y abrirá un nuevo
+                    período como Reingreso.
+                </div>
+
+                <group>
+                    <field
+                        name="effective_date"
+                        invisible="not is_reentry"
+                        required="is_reentry"
+                    />
+                    <field
+                        name="reason"
+                        invisible="not is_reentry"
+                        required="is_reentry"
+                        placeholder="Indique el motivo administrativo del Reingreso..."
+                    />
+                </group>
+
+                <footer>
+                    <button
+                        name="action_confirm"
+                        type="object"
+                        string="Confirmar conversión"
+                        class="btn-primary"
+                    />
+                    <button
+                        string="Cancelar"
+                        special="cancel"
+                        class="btn-secondary"
+                    />
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

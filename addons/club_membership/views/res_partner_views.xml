@@ -138,6 +138,13 @@
                         "
                     />
                     <button
+                        name="action_open_club_client_to_member_wizard"
+                        type="object"
+                        string="Convertir Cliente en Socio"
+                        groups="club_membership.group_club_client_to_member"
+                        invisible="club_person_type != 'client'"
+                    />
+                    <button
                         name="action_open_club_membership_end_wizard"
                         type="object"
                         string="Finalizar membresía"
@@ -178,7 +185,7 @@
                                 name="club_person_type"
                                 required="not club_is_former_member"
                                 readonly="
-                                    club_person_type == 'member'
+                                    club_person_type
                                     or club_is_former_member
                                 "
                             />
