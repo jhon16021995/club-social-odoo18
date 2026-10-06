@@ -4,6 +4,7 @@ from odoo.tools import float_is_zero
 
 _REGISTRATION_ERROR_VOID_TOKEN = object()
 _CERTIFICATE_MEMBER_WITHDRAWAL_INTERNAL_TOKEN = object()
+_CERTIFICATE_MEMBERSHIP_END_INTERNAL_TOKEN = object()
 
 
 class ClubCertificate(models.Model):
@@ -115,6 +116,13 @@ class ClubCertificate(models.Model):
 
     passive_by_member_withdrawal = fields.Boolean(
         string="Pasivo por retiro del Socio titular",
+        readonly=True,
+        copy=False,
+        index=True,
+    )
+
+    passive_by_membership_end = fields.Boolean(
+        string="Pasivo por baja definitiva de membresía",
         readonly=True,
         copy=False,
         index=True,
@@ -485,22 +493,46 @@ class ClubCertificate(models.Model):
             club_certificate_state_change_reason=reason or False,
         ).write(vals)
 
+    def _write_membership_end_values_internal(
+        self,
+        vals,
+        *,
+        reason=False,
+    ):
+        return self.with_context(
+            club_certificate_membership_end_internal_token=(
+                _CERTIFICATE_MEMBERSHIP_END_INTERNAL_TOKEN
+            ),
+            club_certificate_state_change_reason=reason or False,
+        ).write(vals)
+
     def _check_member_withdrawal_write(
         self,
         vals,
         *,
         internal_member_withdrawal_write,
+        internal_membership_end_write,
         internal_registration_error_void,
     ):
         if (
             "passive_by_member_withdrawal" in vals
             and not internal_member_withdrawal_write
+            and not internal_membership_end_write
         ):
             raise AccessError(
                 self.env._(
                     "La marca técnica de Certificado Pasivo por retiro "
                     "solo puede modificarse mediante un proceso "
                     "controlado del sistema."
+                )
+            )
+
+        if "passive_by_membership_end" in vals and not internal_membership_end_write:
+            raise AccessError(
+                self.env._(
+                    "La marca técnica de Certificado Pasivo por baja "
+                    "definitiva solo puede modificarse mediante el proceso "
+                    "controlado de finalización de membresía."
                 )
             )
 
@@ -521,6 +553,20 @@ class ClubCertificate(models.Model):
                 )
             )
 
+        membership_end_state_change = (
+            "state" in vals
+            and vals.get("state") != "passive"
+            and not internal_membership_end_write
+        )
+
+        if membership_end_state_change and self.filtered("passive_by_membership_end"):
+            raise ValidationError(
+                self.env._(
+                    "Un Certificado que quedó Pasivo por baja definitiva "
+                    "de membresía no puede reactivarse ni cambiar de estado."
+                )
+            )
+
     def write(self, vals):
         vals = dict(vals)
 
@@ -534,6 +580,11 @@ class ClubCertificate(models.Model):
             is _REGISTRATION_ERROR_VOID_TOKEN
         )
 
+        internal_membership_end_write = (
+            self.env.context.get("club_certificate_membership_end_internal_token")
+            is _CERTIFICATE_MEMBERSHIP_END_INTERNAL_TOKEN
+        )
+
         protected_registration_error_fields = {
             "registration_error_reason",
             "registration_error_at",
@@ -543,6 +594,7 @@ class ClubCertificate(models.Model):
         self._check_member_withdrawal_write(
             vals,
             internal_member_withdrawal_write=internal_member_withdrawal_write,
+            internal_membership_end_write=internal_membership_end_write,
             internal_registration_error_void=internal_registration_error_void,
         )
 

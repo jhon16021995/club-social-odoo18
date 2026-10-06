@@ -62,6 +62,14 @@ class ClubKardexEvent(models.Model):
                 "Cambio de estado del asociado",
             ),
             (
+                "membership_ended",
+                "Baja definitiva de membresía",
+            ),
+            (
+                "membership_reentered",
+                "Reingreso como Socio",
+            ),
+            (
                 "member_legal_state_changed",
                 "Cambio de estado legal",
             ),

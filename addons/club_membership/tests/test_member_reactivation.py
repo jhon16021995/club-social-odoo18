@@ -17,6 +17,7 @@ class TestMemberReactivation(TransactionCase):
         cls.Certificate = cls.env["club.certificate"].with_user(cls.admin)
         cls.Beneficiary = cls.env["club.beneficiary"].with_user(cls.admin)
         cls.Kardex = cls.env["club.kardex.event"].with_user(cls.admin)
+        cls.Period = cls.env["club.membership.period"].with_user(cls.admin)
         cls.ReactivationWizard = cls.env["club.member.reactivation.wizard"].with_user(
             cls.admin
         )
@@ -110,6 +111,17 @@ class TestMemberReactivation(TransactionCase):
 
         return cls.Beneficiary.create(vals)
 
+    def _assert_single_current_membership_period(self, member):
+        periods = self.Period.search(
+            [
+                ("person_id", "=", member.id),
+            ]
+        )
+
+        self.assertEqual(len(periods), 1)
+        self.assertEqual(periods.state, "current")
+        self.assertFalse(periods.end_date)
+
     def test_reactivation_restores_previous_state_and_related_records(self):
         today = fields.Date.context_today(self.Partner)
 
@@ -119,6 +131,8 @@ class TestMemberReactivation(TransactionCase):
             state="lifetime",
             join_date=today - relativedelta(years=10),
         )
+
+        self._assert_single_current_membership_period(member)
 
         original_id_number = member.club_id_number
         original_member_code = member.club_member_code
@@ -158,6 +172,8 @@ class TestMemberReactivation(TransactionCase):
             effective_date=today,
         )
 
+        self._assert_single_current_membership_period(member)
+
         member.invalidate_recordset()
         certificate.invalidate_recordset()
         eligible_beneficiary.invalidate_recordset()
@@ -186,6 +202,8 @@ class TestMemberReactivation(TransactionCase):
             "Reactivación controlada",
             effective_date=today,
         )
+
+        self._assert_single_current_membership_period(member)
 
         member.invalidate_recordset()
         certificate.invalidate_recordset()

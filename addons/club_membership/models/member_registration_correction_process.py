@@ -393,6 +393,21 @@ class ResPartnerMemberRegistrationCorrection(models.Model):
             reason=normalized_reason,
         )
 
+        membership_period = self.env["club.membership.period"].search(
+            [
+                ("person_id", "=", self.id),
+                ("state", "=", "current"),
+            ],
+            limit=1,
+        )
+
+        if membership_period:
+            # Método protegido intencional: solo este flujo controlado
+            # puede invalidar una membresía originada por alta errónea.
+            membership_period._void_period_internal(  # pylint: disable=protected-access
+                normalized_reason
+            )
+
         # El helper protegido se comparte intencionalmente entre
         # extensiones controladas del mismo modelo res.partner.
         # pylint: disable=protected-access
