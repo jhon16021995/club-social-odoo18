@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_club_membership_end_wizard_form" model="ir.ui.view">
+        <field name="name">club.membership.end.wizard.form</field>
+        <field name="model">club.membership.end.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Baja definitiva / Finalizar membresía">
+                <group>
+                    <group string="Socio">
+                        <field name="member_id"/>
+                        <field name="member_code"/>
+                        <field name="current_member_state"/>
+                        <field name="certificate_id"/>
+                        <field
+                            name="certificate_state"
+                            invisible="not certificate_id"
+                        />
+                    </group>
+
+                    <group string="Vínculos que deben resolverse">
+                        <field name="active_beneficiary_count"/>
+                        <field name="blocked_beneficiary_count"/>
+                    </group>
+                </group>
+
+                <separator string="Datos de la baja definitiva"/>
+
+                <group>
+                    <field name="effective_date"/>
+                    <field
+                        name="reason"
+                        placeholder="Indique el motivo administrativo de la baja definitiva..."
+                    />
+                </group>
+
+                <div class="alert alert-warning" role="alert">
+                    <strong>
+                        Esta operación finaliza definitivamente la membresía.
+                    </strong>
+                    No equivale a un retiro temporal RET y no puede revertirse
+                    mediante REA. El período de membresía vigente quedará
+                    finalizado y la Persona dejará de ser Socio actual.
+                    Si el Certificado Patrimonial está Activo, quedará Pasivo
+                    por baja definitiva. Los Beneficiarios activos o bloqueados
+                    a cargo del Socio deben finalizarse o reasignarse antes de
+                    confirmar. Este proceso no registra pagos, devoluciones ni
+                    movimientos contables.
+                </div>
+
+                <footer>
+                    <button
+                        name="action_confirm"
+                        type="object"
+                        string="Confirmar baja definitiva"
+                        class="btn-primary"
+                        confirm="¿Confirma la baja definitiva de la membresía?"
+                    />
+                    <button
+                        string="Cancelar"
+                        special="cancel"
+                        class="btn-secondary"
+                    />
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

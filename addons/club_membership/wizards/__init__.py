@@ -1,7 +1,9 @@
 from . import (
     beneficiary_transition_wizard,
     member_reactivation_wizard,
+    member_reentry_wizard,
     member_registration_correction_wizard,
     member_withdrawal_wizard,
+    membership_end_wizard,
     person_identity_correction_wizard,
 )

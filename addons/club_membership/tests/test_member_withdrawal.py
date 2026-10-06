@@ -17,6 +17,7 @@ class TestMemberWithdrawal(TransactionCase):
         cls.Certificate = cls.env["club.certificate"].with_user(cls.admin)
         cls.Beneficiary = cls.env["club.beneficiary"].with_user(cls.admin)
         cls.Kardex = cls.env["club.kardex.event"].with_user(cls.admin)
+        cls.Period = cls.env["club.membership.period"].with_user(cls.admin)
         cls.WithdrawalWizard = cls.env["club.member.withdrawal.wizard"].with_user(
             cls.admin
         )
@@ -101,15 +102,30 @@ class TestMemberWithdrawal(TransactionCase):
             }
         )
 
+    def _assert_single_current_membership_period(self, member):
+        periods = self.Period.search(
+            [
+                ("person_id", "=", member.id),
+            ]
+        )
+
+        self.assertEqual(len(periods), 1)
+        self.assertEqual(periods.state, "current")
+        self.assertFalse(periods.end_date)
+
     def test_withdrawal_updates_history_and_related_records(self):
-        today = fields.Date.context_today(self.Partner)
-        reason = "Retiro voluntario para prueba automática"
+        today, reason = (
+            fields.Date.context_today(self.Partner),
+            "Retiro voluntario para prueba automática",
+        )
 
         member = self._create_member(
             name="Socio retiro automático",
             start_number=99500000100,
             join_date=today - relativedelta(years=5),
         )
+
+        self._assert_single_current_membership_period(member)
         original_id_number = member.club_id_number
         original_member_code = member.club_member_code
         original_join_date = member.club_join_date
@@ -158,6 +174,8 @@ class TestMemberWithdrawal(TransactionCase):
             reason,
             effective_date=today,
         )
+
+        self._assert_single_current_membership_period(member)
 
         member.invalidate_recordset()
         certificate.invalidate_recordset()

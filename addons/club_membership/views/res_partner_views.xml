@@ -127,10 +127,28 @@
                             or club_member_state != 'inactive'
                         "
                     />
+                    <button
+                        name="action_open_club_member_reentry_wizard"
+                        type="object"
+                        string="Reingresar como Socio"
+                        groups="club_membership.group_club_member_reentry"
+                        invisible="
+                            not club_is_former_member
+                            or club_person_type
+                        "
+                    />
+                    <button
+                        name="action_open_club_membership_end_wizard"
+                        type="object"
+                        string="Finalizar membresía"
+                        groups="club_membership.group_club_membership_end"
+                        invisible="club_person_type != 'member'"
+                    />
                 </header>
 
                 <sheet>
                     <field name="is_company" invisible="1"/>
+                    <field name="club_is_former_member" invisible="1"/>
 
                     <field
                         name="image_1920"
@@ -158,9 +176,21 @@
 
                             <field
                                 name="club_person_type"
-                                required="1"
-                                readonly="club_person_type == 'member'"
+                                required="not club_is_former_member"
+                                readonly="
+                                    club_person_type == 'member'
+                                    or club_is_former_member
+                                "
                             />
+
+                            <div
+                                name="club_former_member_condition"
+                                class="alert alert-info"
+                                invisible="not club_is_former_member"
+                            >
+                                <strong>Condición institucional:</strong>
+                                Ex-Socio
+                            </div>
 
                             <field
                                 name="club_id_number"
@@ -1028,6 +1058,49 @@
     </record>
 
     <!-- ============================================================
+         LISTA DE EX-SOCIOS
+         ============================================================ -->
+
+    <record id="view_club_former_member_list" model="ir.ui.view">
+        <field name="name">res.partner.club.former.member.list</field>
+        <field name="model">res.partner</field>
+        <field name="arch" type="xml">
+            <list string="Ex-Socios" create="false">
+                <field name="name"/>
+
+                <field
+                    name="company_type"
+                    string="Persona / Empresa"
+                />
+
+                <field
+                    name="club_id_number"
+                    string="Carnet / Identificación"
+                />
+
+                <field name="club_id_extension"/>
+
+                <field
+                    name="club_person_type"
+                    string="Rol actual"
+                />
+
+                <field
+                    name="club_is_former_member"
+                    string="Ex-Socio"
+                />
+
+                <field name="mobile"/>
+
+                <field
+                    name="email"
+                    optional="hide"
+                />
+            </list>
+        </field>
+    </record>
+
+    <!-- ============================================================
          BÚSQUEDA DE SOCIOS
          ============================================================ -->
 
@@ -1132,6 +1205,38 @@
     </record>
 
     <!-- ============================================================
+         BÚSQUEDA DE EX-SOCIOS
+         ============================================================ -->
+
+    <record id="view_club_former_member_search" model="ir.ui.view">
+        <field name="name">res.partner.club.former.member.search</field>
+        <field name="model">res.partner</field>
+        <field name="arch" type="xml">
+            <search string="Buscar Ex-Socios">
+                <field name="name"/>
+                <field name="club_id_number"/>
+                <field name="phone"/>
+                <field name="mobile"/>
+                <field name="email"/>
+
+                <group expand="0" string="Agrupar por">
+                    <filter
+                        string="Rol actual"
+                        name="group_former_member_person_type"
+                        context="{'group_by': 'club_person_type'}"
+                    />
+
+                    <filter
+                        string="Persona / Empresa"
+                        name="group_former_member_company_type"
+                        context="{'group_by': 'company_type'}"
+                    />
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ============================================================
          ACCIÓN DE SOCIOS
          ============================================================ -->
 
@@ -1226,6 +1331,63 @@
     </record>
 
     <!-- ============================================================
+         ACCIÓN DE EX-SOCIOS
+         ============================================================ -->
+
+    <record id="action_club_former_members" model="ir.actions.act_window">
+        <field name="name">Ex-Socios</field>
+        <field name="res_model">res.partner</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" eval="False"/>
+        <field
+            name="search_view_id"
+            ref="view_club_former_member_search"
+        />
+
+        <field name="domain">
+            [('club_is_former_member', '=', True)]
+        </field>
+
+        <field name="context">
+            {
+                'create': False
+            }
+        </field>
+    </record>
+
+    <record
+        id="action_club_former_members_view_list"
+        model="ir.actions.act_window.view"
+    >
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">list</field>
+        <field
+            name="view_id"
+            ref="view_club_former_member_list"
+        />
+        <field
+            name="act_window_id"
+            ref="action_club_former_members"
+        />
+    </record>
+
+    <record
+        id="action_club_former_members_view_form"
+        model="ir.actions.act_window.view"
+    >
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">form</field>
+        <field
+            name="view_id"
+            ref="view_partner_form_club_membership"
+        />
+        <field
+            name="act_window_id"
+            ref="action_club_former_members"
+        />
+    </record>
+
+    <!-- ============================================================
          ACCIÓN GENERAL DE BENEFICIARIOS
          ============================================================ -->
 
@@ -1310,10 +1472,18 @@
     />
 
     <menuitem
+        id="menu_club_former_members"
+        name="Ex-Socios"
+        parent="menu_club_social_root"
+        action="action_club_former_members"
+        sequence="30"
+    />
+
+    <menuitem
         id="menu_club_beneficiaries"
         name="Beneficiarios"
         parent="menu_club_social_root"
         action="action_club_beneficiaries"
-        sequence="30"
+        sequence="40"
     />
 </odoo>

@@ -73,6 +73,31 @@
         />
     </record>
 
+
+    <!-- ============================================================
+         BAJA DEFINITIVA DE MEMBRESIA
+         ============================================================ -->
+
+    <record id="group_club_membership_end" model="res.groups">
+        <field name="name">Finalizar membresía definitivamente</field>
+        <field
+            name="category_id"
+            ref="club_membership.module_category_club_social"
+        />
+    </record>
+
+    <!-- ============================================================
+         REINGRESO DE EX-SOCIO COMO SOCIO
+         ============================================================ -->
+
+    <record id="group_club_member_reentry" model="res.groups">
+        <field name="name">Reingresar Ex-Socio como Socio</field>
+        <field
+            name="category_id"
+            ref="club_membership.module_category_club_social"
+        />
+    </record>
+
     <!--
         Durante esta fase los administradores del sistema reciben
         automáticamente los permisos especiales de corrección.
@@ -106,8 +131,33 @@
                         'club_membership.'
                         'group_club_member_reactivation'
                     )
+                ),
+                (
+                    4,
+                    ref(
+                        'club_membership.'
+                        'group_club_membership_end'
+                    )
                 )
             ]"
         />
     </record>
+
+
+
+    <record id="base.group_system" model="res.groups">
+        <field
+            name="implied_ids"
+            eval="[
+                (
+                    4,
+                    ref(
+                        'club_membership.'
+                        'group_club_member_reentry'
+                    )
+                )
+            ]"
+        />
+    </record>
+
 </odoo>

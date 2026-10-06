@@ -18,6 +18,7 @@ class TestMemberRegistrationCorrection(TransactionCase):
         cls.Beneficiary = cls.env["club.beneficiary"].with_user(cls.admin)
         cls.Certificate = cls.env["club.certificate"].with_user(cls.admin)
         cls.Kardex = cls.env["club.kardex.event"].with_user(cls.admin)
+        cls.Period = cls.env["club.membership.period"].with_user(cls.admin)
         cls.Correction = cls.env["club.member.registration.correction"].with_user(
             cls.admin
         )
@@ -506,4 +507,56 @@ class TestMemberRegistrationCorrection(TransactionCase):
         self.assertEqual(
             selection["partner"],
             "Pareja de hecho",
+        )
+
+    def test_correction_voids_membership_period(self):
+        member = self._create_member(
+            name="Socio período alta errónea",
+            start_number=99300009900,
+        )
+
+        period = self.Period.search(
+            [
+                ("person_id", "=", member.id),
+                ("state", "=", "current"),
+            ],
+            limit=1,
+        )
+
+        self.assertTrue(period)
+
+        reason = "Alta administrativa registrada por error"
+
+        self._correct_member(
+            member,
+            reason=reason,
+        )
+
+        member.invalidate_recordset()
+        period.invalidate_recordset()
+
+        self.assertEqual(period.state, "voided")
+        self.assertFalse(period.end_date)
+        self.assertEqual(period.void_reason, reason)
+        self.assertTrue(period.voided_at)
+        self.assertEqual(period.void_user_id, self.admin)
+
+        self.assertFalse(
+            self.Period.search(
+                [
+                    ("person_id", "=", member.id),
+                    ("state", "=", "current"),
+                ],
+                limit=1,
+            )
+        )
+
+        self.assertFalse(
+            self.Period.search(
+                [
+                    ("person_id", "=", member.id),
+                    ("state", "=", "finalized"),
+                ],
+                limit=1,
+            )
         )

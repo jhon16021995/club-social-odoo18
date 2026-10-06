@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_club_member_reentry_wizard_form" model="ir.ui.view">
+        <field name="name">club.member.reentry.wizard.form</field>
+        <field name="model">club.member.reentry.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Reingresar Ex-Socio como Socio">
+                <group>
+                    <group string="Ex-Socio">
+                        <field name="person_id"/>
+                        <field name="id_number"/>
+                        <field name="last_membership_end_date"/>
+                    </group>
+
+                    <group string="Impacto del Reingreso">
+                        <field name="certificate_id"/>
+                        <field
+                            name="certificate_state"
+                            invisible="not certificate_id"
+                        />
+                        <field
+                            name="certificate_will_reactivate"
+                            invisible="not certificate_id"
+                        />
+                        <field name="active_beneficiary_count"/>
+                        <field name="blocked_beneficiary_count"/>
+                    </group>
+                </group>
+
+                <separator string="Datos del Reingreso"/>
+
+                <group>
+                    <field name="effective_date"/>
+                    <field
+                        name="reason"
+                        placeholder="Indique el motivo administrativo del Reingreso..."
+                    />
+                </group>
+
+                <div class="alert alert-info" role="alert">
+                    <strong>El Reingreso conserva todo el historial.</strong>
+                    Esta operación abre un nuevo período de membresía y no es una REA.
+                    La membresía anterior permanece finalizada. La fecha del nuevo
+                    período puede ser igual o posterior a la última baja definitiva,
+                    pero nunca anterior. Si el Certificado quedó Pasivo específicamente
+                    por esa baja definitiva, será reactivado. Los Certificados con otra
+                    situación causal no serán modificados.
+                </div>
+
+                <div
+                    class="alert alert-warning"
+                    role="alert"
+                    invisible="
+                        not active_beneficiary_count
+                        and not blocked_beneficiary_count
+                    "
+                >
+                    El Reingreso no podrá confirmarse mientras la Persona conserve
+                    un vínculo vigente como Beneficiario Activo o Bloqueado.
+                    Finalice primero ese vínculo.
+                </div>
+
+                <footer>
+                    <button
+                        name="action_confirm"
+                        type="object"
+                        string="Confirmar Reingreso"
+                        class="btn-primary"
+                        confirm="¿Confirma el Reingreso del Ex-Socio como Socio?"
+                    />
+                    <button
+                        string="Cancelar"
+                        special="cancel"
+                        class="btn-secondary"
+                    />
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>
