@@ -20,6 +20,7 @@
         "views/member_withdrawal_wizard_views.xml",
         "views/member_reactivation_wizard_views.xml",
         "views/member_reentry_wizard_views.xml",
+        "views/client_to_beneficiary_wizard_views.xml",
         "views/client_to_member_wizard_views.xml",
         "views/membership_end_wizard_views.xml",
         "views/beneficiary_transition_wizard_views.xml",

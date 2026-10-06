@@ -145,6 +145,13 @@
                         invisible="club_person_type != 'client'"
                     />
                     <button
+                        name="action_open_club_client_to_beneficiary_wizard"
+                        type="object"
+                        string="Convertir Cliente en Beneficiario"
+                        groups="club_membership.group_club_client_to_beneficiary"
+                        invisible="club_person_type != 'client'"
+                    />
+                    <button
                         name="action_open_club_membership_end_wizard"
                         type="object"
                         string="Finalizar membresía"

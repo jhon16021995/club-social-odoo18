@@ -8,6 +8,7 @@ from . import (
     membership_period,
     person_audit,
     res_partner,
+    res_partner_client_to_beneficiary_conversion,
     res_partner_client_to_member_conversion,
     res_partner_identity,
     res_partner_member_reactivation,
