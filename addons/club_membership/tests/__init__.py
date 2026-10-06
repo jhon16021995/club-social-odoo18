@@ -1,5 +1,7 @@
 from . import (
     test_beneficiary_rules,
+    test_client_to_member_conversion,
+    test_client_to_member_conversion_ui,
     test_former_member_status,
     test_former_member_ui,
     test_member_definitive_end,

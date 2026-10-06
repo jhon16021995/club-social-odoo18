@@ -116,5 +116,5 @@ class TestFormerMemberUI(TransactionCase):
 
         self.assertEqual(
             readonly_expression,
-            "club_person_type == 'member' or club_is_former_member",
+            "club_person_type or club_is_former_member",
         )
