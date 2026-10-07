@@ -5,7 +5,7 @@ from .beneficiary import _CLUB_BENEFICIARY_TRANSITION_INTERNAL_TOKEN
 
 
 class ClubBeneficiaryTransition(models.Model):
-    _inherit = "club.beneficiary"
+    _inherit = "club.beneficiary"  # pylint: disable=consider-merging-classes-inherited
 
     def write(self, vals):
         internal_transition_write = (

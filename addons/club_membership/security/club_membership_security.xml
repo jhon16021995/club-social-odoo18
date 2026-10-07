@@ -198,4 +198,31 @@
         />
     </record>
 
+    <!-- ============================================================
+         CONVERSIÓN CONTROLADA DE BENEFICIARIO A CLIENTE
+         ============================================================ -->
+
+    <record id="group_club_beneficiary_to_client" model="res.groups">
+        <field name="name">Convertir Beneficiario en Cliente</field>
+        <field
+            name="category_id"
+            ref="club_membership.module_category_club_social"
+        />
+    </record>
+
+    <record id="base.group_system" model="res.groups">
+        <field
+            name="implied_ids"
+            eval="[
+                (
+                    4,
+                    ref(
+                        'club_membership.'
+                        'group_club_beneficiary_to_client'
+                    )
+                )
+            ]"
+        />
+    </record>
+
 </odoo>

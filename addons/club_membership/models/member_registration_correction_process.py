@@ -5,7 +5,7 @@ _MEMBER_REGISTRATION_CORRECTION_TOKEN = object()
 
 
 class ResPartnerMemberRegistrationCorrection(models.Model):
-    _inherit = "res.partner"
+    _inherit = "res.partner"  # pylint: disable=consider-merging-classes-inherited
 
     def _check_member_registration_correction_permission(self):
         if not self.env.user.has_group(

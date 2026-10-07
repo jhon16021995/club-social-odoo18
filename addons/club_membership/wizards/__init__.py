@@ -1,4 +1,5 @@
 from . import (
+    beneficiary_to_client_wizard,
     beneficiary_transition_wizard,
     client_to_beneficiary_wizard,
     client_to_member_wizard,
