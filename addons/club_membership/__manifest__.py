@@ -24,6 +24,7 @@
         "views/client_to_member_wizard_views.xml",
         "views/membership_end_wizard_views.xml",
         "views/beneficiary_transition_wizard_views.xml",
+        "views/beneficiary_to_client_wizard_views.xml",
         "views/certificate_views.xml",
         "views/kardex_views.xml",
     ],

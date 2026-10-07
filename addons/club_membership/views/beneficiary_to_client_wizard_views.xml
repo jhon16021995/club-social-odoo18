@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record
+        id="view_club_beneficiary_to_client_wizard_form"
+        model="ir.ui.view"
+    >
+        <field name="name">club.beneficiary.to.client.wizard.form</field>
+        <field name="model">club.beneficiary.to.client.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Convertir Beneficiario en Cliente">
+                <field name="beneficiary_id" invisible="1"/>
+
+                <group>
+                    <group string="Beneficiario">
+                        <field name="person_id"/>
+                        <field name="member_id"/>
+                        <field name="relationship"/>
+                        <field name="beneficiary_state"/>
+                    </group>
+
+                    <group
+                        string="Finalización del vínculo"
+                        invisible="beneficiary_state == 'finalized'"
+                    >
+                        <field
+                            name="end_date"
+                            required="beneficiary_state != 'finalized'"
+                        />
+                        <field
+                            name="reason"
+                            required="beneficiary_state != 'finalized'"
+                            placeholder="
+                                Explique el motivo de la conversión a Cliente...
+                            "
+                        />
+                    </group>
+                </group>
+
+                <div
+                    class="alert alert-info"
+                    role="status"
+                    invisible="beneficiary_state == 'finalized'"
+                >
+                    Se finalizará el vínculo vigente de Beneficiario y la misma
+                    Persona, conservando su carnet e identidad, pasará a tener
+                    la condición de Cliente. Ambas operaciones forman una sola
+                    conversión controlada.
+                </div>
+
+                <div
+                    class="alert alert-info"
+                    role="status"
+                    invisible="beneficiary_state != 'finalized'"
+                >
+                    Este vínculo ya es histórico y no será modificado.
+                    La misma Persona y su carnet se conservarán y se establecerá
+                    únicamente la condición actual de Cliente.
+                </div>
+
+                <footer>
+                    <button
+                        name="action_confirm"
+                        type="object"
+                        string="Confirmar conversión"
+                        class="btn-primary"
+                    />
+                    <button
+                        string="Cancelar"
+                        special="cancel"
+                        class="btn-secondary"
+                    />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record
+        id="view_club_beneficiary_form_beneficiary_to_client"
+        model="ir.ui.view"
+    >
+        <field name="name">
+            club.beneficiary.form.beneficiary.to.client
+        </field>
+        <field name="model">club.beneficiary</field>
+        <field
+            name="inherit_id"
+            ref="view_club_beneficiary_form_transition_actions"
+        />
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button
+                    name="action_open_club_beneficiary_to_client_wizard"
+                    type="object"
+                    string="Convertir en Cliente"
+                    groups="club_membership.group_club_beneficiary_to_client"
+                    invisible="converted_member_id"
+                    confirm="
+                        La misma Persona y su carnet serán conservados.
+                        ¿Desea iniciar la conversión controlada a Cliente?
+                    "
+                />
+            </xpath>
+        </field>
+    </record>
+
+    <record
+        id="view_partner_form_beneficiary_to_client"
+        model="ir.ui.view"
+    >
+        <field name="name">
+            res.partner.form.beneficiary.to.client
+        </field>
+        <field name="model">res.partner</field>
+        <field
+            name="inherit_id"
+            ref="view_partner_form_club_beneficiary_transition_actions"
+        />
+        <field name="arch" type="xml">
+            <xpath
+                expr="//field[@name='club_beneficiary_ids']/form/header"
+                position="inside"
+            >
+                <button
+                    name="action_open_club_beneficiary_to_client_wizard"
+                    type="object"
+                    string="Convertir en Cliente"
+                    groups="club_membership.group_club_beneficiary_to_client"
+                    invisible="converted_member_id"
+                    confirm="
+                        La misma Persona y su carnet serán conservados.
+                        ¿Desea iniciar la conversión controlada a Cliente?
+                    "
+                />
+            </xpath>
+        </field>
+    </record>
+</odoo>

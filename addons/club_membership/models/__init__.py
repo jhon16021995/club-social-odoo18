@@ -1,3 +1,4 @@
+# ruff: noqa: I001
 from . import (
     beneficiary,
     beneficiary_transition,
@@ -10,6 +11,7 @@ from . import (
     res_partner,
     res_partner_client_to_beneficiary_conversion,
     res_partner_client_to_member_conversion,
+    beneficiary_to_client_conversion,
     res_partner_identity,
     res_partner_member_reactivation,
     res_partner_membership_end,
