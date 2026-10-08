@@ -135,6 +135,18 @@
                         invisible="
                             not club_is_former_member
                             or club_person_type
+                            or club_has_current_beneficiary_link
+                        "
+                    />
+                    <button
+                        name="action_open_club_former_member_to_beneficiary_wizard"
+                        type="object"
+                        string="Convertir Ex-Socio en Beneficiario"
+                        groups="club_membership.group_club_former_member_to_beneficiary"
+                        invisible="
+                            not club_is_former_member
+                            or club_person_type
+                            or club_has_current_beneficiary_link
                         "
                     />
                     <button
@@ -145,6 +157,7 @@
                         invisible="
                             not club_is_former_member
                             or club_person_type
+                            or club_has_current_beneficiary_link
                         "
                     />
                     <button
@@ -173,6 +186,10 @@
                 <sheet>
                     <field name="is_company" invisible="1"/>
                     <field name="club_is_former_member" invisible="1"/>
+                    <field
+                        name="club_has_current_beneficiary_link"
+                        invisible="1"
+                    />
 
                     <field
                         name="image_1920"

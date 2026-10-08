@@ -252,4 +252,35 @@
         />
     </record>
 
+
+    <!-- ============================================================
+         CONVERSIÓN CONTROLADA DE EX-SOCIO A BENEFICIARIO
+         ============================================================ -->
+
+    <record
+        id="group_club_former_member_to_beneficiary"
+        model="res.groups"
+    >
+        <field name="name">Convertir Ex-Socio en Beneficiario</field>
+        <field
+            name="category_id"
+            ref="club_membership.module_category_club_social"
+        />
+    </record>
+
+    <record id="base.group_system" model="res.groups">
+        <field
+            name="implied_ids"
+            eval="[
+                (
+                    4,
+                    ref(
+                        'club_membership.'
+                        'group_club_former_member_to_beneficiary'
+                    )
+                )
+            ]"
+        />
+    </record>
+
 </odoo>

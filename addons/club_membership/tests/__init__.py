@@ -7,6 +7,8 @@ from . import (
     test_client_to_member_conversion,
     test_client_to_member_conversion_ui,
     test_former_member_status,
+    test_former_member_to_beneficiary_conversion,
+    test_former_member_to_beneficiary_conversion_ui,
     test_former_member_to_client_conversion,
     test_former_member_to_client_conversion_ui,
     test_former_member_ui,

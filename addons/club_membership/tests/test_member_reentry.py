@@ -193,12 +193,12 @@ class TestMemberReentry(TransactionCase):
             join_date=today - relativedelta(years=4),
         )
 
-        self.Beneficiary.create(
+        member.action_convert_former_member_to_beneficiary(
             {
-                "person_id": member.id,
                 "member_id": holder.id,
                 "relationship": "spouse",
                 "special_condition": "none",
+                "start_date": today,
             }
         )
 

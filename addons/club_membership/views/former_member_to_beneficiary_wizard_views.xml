@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record
+        id="view_club_former_member_to_beneficiary_wizard_form"
+        model="ir.ui.view"
+    >
+        <field
+            name="name"
+        >club.former.member.to.beneficiary.wizard.form</field>
+        <field
+            name="model"
+        >club.former.member.to.beneficiary.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Convertir Ex-Socio en Beneficiario">
+                <group>
+                    <group string="Ex-Socio">
+                        <field name="person_id"/>
+                        <field name="id_number"/>
+                        <field name="last_membership_end_date"/>
+                    </group>
+
+                    <group string="Nuevo vínculo">
+                        <field name="member_id"/>
+                        <field name="relationship"/>
+                        <field
+                            name="relationship_detail"
+                            invisible="
+                                relationship != 'family_dependent'
+                            "
+                            required="
+                                relationship == 'family_dependent'
+                            "
+                            placeholder="
+                                Especifique el vínculo familiar
+                            "
+                        />
+                        <field name="special_condition"/>
+                        <field name="start_date"/>
+                    </group>
+                </group>
+
+                <group>
+                    <field
+                        name="observations"
+                        placeholder="
+                            Observaciones administrativas opcionales...
+                        "
+                    />
+                </group>
+
+                <div class="alert alert-info" role="alert">
+                    Se conservarán la misma Persona, carnet,
+                    períodos históricos de membresía y Certificado
+                    Patrimonial. Se creará únicamente un nuevo vínculo
+                    vigente como Beneficiario.
+                </div>
+
+                <div class="alert alert-warning" role="alert">
+                    La fecha de inicio no puede ser anterior a la
+                    finalización de la última membresía. Si ya existe
+                    otro vínculo vigente como Beneficiario, primero
+                    debe resolverse ese vínculo.
+                </div>
+
+                <footer>
+                    <button
+                        name="action_confirm"
+                        type="object"
+                        string="Confirmar conversión"
+                        class="btn-primary"
+                        confirm="¿Confirma la conversión del Ex-Socio en Beneficiario?"
+                    />
+                    <button
+                        string="Cancelar"
+                        special="cancel"
+                        class="btn-secondary"
+                    />
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>
