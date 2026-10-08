@@ -110,15 +110,16 @@ class TestFormerMemberToClientConversion(TransactionCase):
             join_date=today - relativedelta(years=8),
         )
 
-        return self.Beneficiary.create(
+        beneficiary_id = person.action_convert_former_member_to_beneficiary(
             {
-                "person_id": person.id,
                 "member_id": titular.id,
                 "relationship": "parent",
                 "special_condition": "none",
                 "start_date": today,
             }
         )
+
+        return self.Beneficiary.browse(beneficiary_id)
 
     def test_direct_former_member_to_client_write_is_blocked(self):
         former, _certificate, _today = self._prepare_former_member(
