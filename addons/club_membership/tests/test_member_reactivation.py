@@ -862,11 +862,11 @@ class TestMemberReactivation(TransactionCase):
             "active",
         )
 
-    def test_reactivation_is_blocked_while_member_is_current_beneficiary(self):
+    def test_reactivation_remains_available_after_rejected_beneficiary_role(self):
         today = fields.Date.context_today(self.Partner)
 
         member = self._create_member(
-            "Socio REA que luego será Beneficiario",
+            "Socio REA con intento incompatible de Beneficiario",
             99510002300,
             join_date=today - relativedelta(years=5),
         )
@@ -884,7 +884,7 @@ class TestMemberReactivation(TransactionCase):
         )
 
         member.action_withdraw_club_member(
-            "Retiro previo a vínculo como Beneficiario",
+            "Retiro previo a intento incompatible",
             effective_date=today,
         )
 
@@ -894,52 +894,38 @@ class TestMemberReactivation(TransactionCase):
 
         self.assertEqual(member.club_member_state, "inactive")
         self.assertEqual(certificate.state, "passive")
-        self.assertTrue(certificate.passive_by_member_withdrawal)
         self.assertEqual(own_beneficiary.state, "blocked")
-        self.assertTrue(own_beneficiary.blocked_by_member_withdrawal)
 
         titular = self._create_member(
-            "Socio titular del vínculo vigente",
+            "Socio titular del intento incompatible",
             99510002500,
             join_date=today - relativedelta(years=4),
         )
 
-        current_link = self._create_beneficiary(
-            titular,
-            member,
-            relationship="spouse",
-            start_date=today,
-        )
-
-        self.assertEqual(current_link.state, "active")
-        self.assertEqual(current_link.person_id, member)
-
-        with self.assertRaisesRegex(
-            ValidationError,
-            "Finalice primero el vínculo",
+        with (
+            self.assertRaisesRegex(
+                ValidationError,
+                "incluso si se encuentra Pasivo",
+            ),
+            self.env.cr.savepoint(),
         ):
-            member.action_reactivate_club_member(
-                "Intento de reactivación con vínculo vigente",
-                effective_date=today,
+            self._create_beneficiary(
+                titular,
+                member,
+                relationship="spouse",
+                start_date=today,
             )
+
+        member.action_reactivate_club_member(
+            "Reactivación posterior al intento rechazado",
+            effective_date=today,
+        )
 
         member.invalidate_recordset()
         certificate.invalidate_recordset()
         own_beneficiary.invalidate_recordset()
-        current_link.invalidate_recordset()
 
-        self.assertEqual(member.club_member_state, "inactive")
-        self.assertEqual(
-            member.club_state_before_withdrawal,
-            "active",
-        )
-        self.assertFalse(member.club_last_reactivation_date)
-
-        self.assertEqual(certificate.state, "passive")
-        self.assertTrue(certificate.passive_by_member_withdrawal)
-
-        self.assertEqual(own_beneficiary.state, "blocked")
-        self.assertTrue(own_beneficiary.blocked_by_member_withdrawal)
-
-        self.assertEqual(current_link.state, "active")
-        self.assertEqual(current_link.person_id, member)
+        self.assertEqual(member.club_member_state, "active")
+        self.assertEqual(certificate.state, "active")
+        self.assertEqual(own_beneficiary.state, "active")
+        self.assertFalse(own_beneficiary.blocked_by_member_withdrawal)

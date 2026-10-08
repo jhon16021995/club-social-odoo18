@@ -427,7 +427,7 @@ class TestBeneficiaryRules(TransactionCase):
             "Límite de edad alcanzado",
         )
 
-    def test_active_member_cannot_be_current_beneficiary_but_passive_can(self):
+    def test_member_cannot_be_current_beneficiary_even_if_passive(self):
         active_member = self._create_member(
             name="Socio activo no puede ser Beneficiario",
             start_number=99200001000,
@@ -441,35 +441,35 @@ class TestBeneficiaryRules(TransactionCase):
             )
 
         passive_member = self._create_member(
-            name="Socio Pasivo que puede ser Beneficiario",
+            name="Socio Pasivo tampoco puede ser Beneficiario",
             start_number=99200001001,
             state="inactive",
         )
 
-        beneficiary = self._create_beneficiary(
-            passive_member,
-            relationship="spouse",
-        )
-
-        self.assertEqual(
-            beneficiary.state,
-            "active",
-        )
-        self.assertEqual(
-            beneficiary.person_id,
-            passive_member,
-        )
-        self.assertEqual(
-            beneficiary.person_id.club_member_state,
-            "inactive",
-        )
-
-        with self.assertRaises(ValidationError):
-            passive_member.write(
-                {
-                    "club_member_state": "active",
-                }
+        with (
+            self.assertRaisesRegex(
+                ValidationError,
+                "incluso si se encuentra Pasivo",
+            ),
+            self.env.cr.savepoint(),
+        ):
+            self._create_beneficiary(
+                passive_member,
+                relationship="spouse",
             )
+
+        self.assertFalse(
+            self.Beneficiary.search(
+                [
+                    ("person_id", "=", passive_member.id),
+                    ("state", "in", ("active", "blocked")),
+                ],
+                limit=1,
+            )
+        )
+
+        passive_member.invalidate_recordset()
+        self.assertEqual(passive_member.club_member_state, "inactive")
 
     def test_direct_finalization_is_blocked_but_controlled_flow_works(self):
         person = self._create_person(

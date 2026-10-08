@@ -697,17 +697,17 @@ class TestMemberDefinitiveEnd(TransactionCase):  # pylint: disable=too-many-publ
 
         self.assertEqual(member.club_person_type, "member")
 
-    def test_passive_member_can_end_while_beneficiary_of_another_member(self):
+    def test_passive_member_must_end_membership_before_becoming_beneficiary(self):
         today = fields.Date.context_today(self.Partner)
 
         member = self._create_member(
-            "Socio Pasivo que también es Beneficiario",
+            "Socio Pasivo previo a conversión controlada",
             99600002300,
             join_date=today - relativedelta(years=5),
         )
 
         member.action_withdraw_club_member(
-            "Retiro previo a vínculo como Beneficiario.",
+            "Retiro previo a baja definitiva.",
             effective_date=today,
         )
 
@@ -715,33 +715,26 @@ class TestMemberDefinitiveEnd(TransactionCase):  # pylint: disable=too-many-publ
         self.assertEqual(member.club_member_state, "inactive")
 
         titular = self._create_member(
-            "Socio titular del Ex-Socio Beneficiario",
+            "Socio titular del futuro Ex-Socio Beneficiario",
             99600002400,
             join_date=today - relativedelta(years=4),
         )
 
-        current_link = self._create_beneficiary(
-            titular,
-            member,
-        )
-
-        self.assertEqual(current_link.state, "active")
-        self.assertEqual(current_link.person_id, member)
+        with self.assertRaises(ValidationError), self.env.cr.savepoint():
+            self._create_beneficiary(
+                titular,
+                member,
+            )
 
         member.action_end_club_membership(
-            "Baja definitiva manteniendo vínculo Beneficiario externo.",
+            "Baja definitiva previa a conversión a Beneficiario.",
             effective_date=today,
         )
 
         member.invalidate_recordset()
-        current_link.invalidate_recordset()
 
         self.assertFalse(member.club_person_type)
         self.assertFalse(member.club_member_state)
-
-        self.assertEqual(current_link.state, "active")
-        self.assertEqual(current_link.person_id, member)
-        self.assertEqual(current_link.member_id, titular)
 
         finalized_period = self.Period.search(
             [
@@ -751,6 +744,21 @@ class TestMemberDefinitiveEnd(TransactionCase):  # pylint: disable=too-many-publ
             limit=1,
         )
         self.assertTrue(finalized_period)
+
+        beneficiary_id = member.action_convert_former_member_to_beneficiary(
+            {
+                "member_id": titular.id,
+                "relationship": "spouse",
+                "special_condition": "none",
+                "start_date": today,
+            }
+        )
+
+        current_link = self.Beneficiary.browse(beneficiary_id)
+
+        self.assertEqual(current_link.state, "active")
+        self.assertEqual(current_link.person_id, member)
+        self.assertEqual(current_link.member_id, titular)
 
     def test_definitive_end_creates_exactly_one_membership_ended_event(self):
         today = fields.Date.context_today(self.Partner)
