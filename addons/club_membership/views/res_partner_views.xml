@@ -138,6 +138,16 @@
                         "
                     />
                     <button
+                        name="action_open_club_former_member_to_client_wizard"
+                        type="object"
+                        string="Convertir Ex-Socio en Cliente"
+                        groups="club_membership.group_club_former_member_to_client"
+                        invisible="
+                            not club_is_former_member
+                            or club_person_type
+                        "
+                    />
+                    <button
                         name="action_open_club_client_to_member_wizard"
                         type="object"
                         string="Convertir Cliente en Socio"

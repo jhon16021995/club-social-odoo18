@@ -206,10 +206,8 @@ class TestClientToMemberConversion(TransactionCase):
 
         member.invalidate_recordset()
 
-        member.write(
-            {
-                "club_person_type": "client",
-            }
+        member.action_convert_former_member_to_client(
+            "Preparación controlada de Cliente histórico para prueba C->M."
         )
 
         member.invalidate_recordset()

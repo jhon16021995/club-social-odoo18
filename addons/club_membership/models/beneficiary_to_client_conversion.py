@@ -241,6 +241,7 @@ class ResPartnerBeneficiaryToClientProtection(models.Model):
             new_person_type == "client"
             and partner.club_person_type not in ("client", "member")
             and not self._is_club_beneficiary_to_client_internal_write()
+            and not self._is_club_former_member_to_client_internal_write()
         ):
             beneficiary_history = self.env["club.beneficiary"].search(
                 [

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record
+        id="view_club_former_member_to_client_wizard_form"
+        model="ir.ui.view"
+    >
+        <field name="name">club.former.member.to.client.wizard.form</field>
+        <field name="model">club.former.member.to.client.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Convertir Ex-Socio en Cliente">
+                <group>
+                    <group string="Ex-Socio">
+                        <field name="person_id"/>
+                        <field name="id_number"/>
+                        <field name="last_membership_end_date"/>
+                    </group>
+                </group>
+
+                <separator string="Datos de la conversión"/>
+
+                <group>
+                    <field
+                        name="reason"
+                        placeholder="Indique el motivo administrativo de la conversión..."
+                    />
+                </group>
+
+                <div class="alert alert-info" role="alert">
+                    <strong>
+                        La conversión conserva la misma Persona y su historial.
+                    </strong>
+                    No crea ni reabre períodos de membresía. Los períodos
+                    finalizados permanecen intactos, se conserva el mismo
+                    Carnet / Identificación y el Certificado Patrimonial no se
+                    reactiva ni se modifica por esta operación. Si posteriormente
+                    el Cliente vuelve a ser Socio, deberá hacerlo mediante el
+                    proceso correspondiente de Reingreso y nunca como alta inicial.
+                </div>
+
+                <div class="alert alert-warning" role="alert">
+                    La conversión no puede completarse mientras la Persona
+                    conserve un vínculo vigente como Beneficiario Activo o
+                    Bloqueado. Ese vínculo debe resolverse primero.
+                </div>
+
+                <footer>
+                    <button
+                        name="action_confirm"
+                        type="object"
+                        string="Confirmar conversión"
+                        class="btn-primary"
+                        confirm="¿Confirma la conversión del Ex-Socio en Cliente?"
+                    />
+                    <button
+                        string="Cancelar"
+                        special="cancel"
+                        class="btn-secondary"
+                    />
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

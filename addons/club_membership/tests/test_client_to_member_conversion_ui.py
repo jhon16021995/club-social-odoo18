@@ -73,11 +73,11 @@ class TestClientToMemberConversionUI(TransactionCase):
             effective_date=today,
         )
 
-        person.write(
-            {
-                "club_person_type": "client",
-            }
+        person.action_convert_former_member_to_client(
+            "Preparación controlada de Cliente histórico para prueba UI C->M."
         )
+
+        person.invalidate_recordset()
 
         return person, today
 
