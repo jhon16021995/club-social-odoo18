@@ -1,6 +1,8 @@
 from odoo import api, fields, models
 from odoo.exceptions import AccessError, ValidationError
 
+_CLUB_KARDEX_REGISTRATION_CORRECTION_TOKEN = object()
+
 
 class ClubKardexEvent(models.Model):
     _name = "club.kardex.event"
@@ -218,6 +220,40 @@ class ClubKardexEvent(models.Model):
         )
 
     @api.model
+    def _log_registration_error_correction(
+        self,
+        member,
+        description,
+        **event_data,
+    ):
+        beneficiary = event_data.get("beneficiary")
+
+        if not member or not beneficiary or beneficiary.person_id != member:
+            raise ValidationError(
+                self.env._(
+                    "La corrección de alta errónea debe vincular "
+                    "al Beneficiario con la misma Persona corregida."
+                )
+            )
+
+        # Llamada protegida intencional dentro del mismo modelo:
+        # esta ruta solo existe para la corrección controlada de alta errónea.
+        # pylint: disable=protected-access
+        result = self.with_context(
+            club_kardex_registration_correction_token=(
+                _CLUB_KARDEX_REGISTRATION_CORRECTION_TOKEN
+            )
+        )._log_event(
+            member,
+            "member_registration_error_corrected",
+            description,
+            **event_data,
+        )
+        # pylint: enable=protected-access
+
+        return result
+
+    @api.model
     def _log_event(
         self,
         member,
@@ -225,7 +261,15 @@ class ClubKardexEvent(models.Model):
         description,
         **event_data,
     ):
-        if not member or member.club_person_type != "member":
+        registration_correction = (
+            self.env.context.get("club_kardex_registration_correction_token")
+            is _CLUB_KARDEX_REGISTRATION_CORRECTION_TOKEN
+            and event_type == "member_registration_error_corrected"
+        )
+
+        if not member or (
+            member.club_person_type != "member" and not registration_correction
+        ):
             raise ValidationError(
                 self.env._("Todo evento del Kardex debe estar vinculado a un socio.")
             )

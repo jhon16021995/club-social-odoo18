@@ -219,9 +219,9 @@ class ResPartnerMemberReactivation(models.Model):
         if current_beneficiary_link:
             raise ValidationError(
                 self.env._(
-                    "Un Socio con un vínculo vigente como Beneficiario "
-                    "debe permanecer Pasivo. Finalice primero el vínculo "
-                    "de Beneficiario antes de reactivar al Socio."
+                    "Un Socio no puede reactivarse mientras exista un "
+                    "vínculo vigente como Beneficiario. Finalice primero "
+                    "el vínculo de Beneficiario."
                 )
             )
 

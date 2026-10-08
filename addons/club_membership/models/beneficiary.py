@@ -309,15 +309,13 @@ class ClubBeneficiary(models.Model):
                     )
                 )
 
-            if (
-                person.club_person_type == "member"
-                and person.club_member_state != "inactive"
-            ):
+            if person.club_person_type == "member":
                 raise ValidationError(
                     self.env._(
-                        "Un Socio vigente no puede ser Beneficiario. "
-                        "Solo un Socio Pasivo puede tener un vínculo "
-                        "vigente como Beneficiario."
+                        "Un Socio no puede tener un vínculo vigente como "
+                        "Beneficiario, incluso si se encuentra Pasivo. "
+                        "Debe finalizar primero su membresía y utilizar "
+                        "el proceso correspondiente para Ex-Socios."
                     )
                 )
 

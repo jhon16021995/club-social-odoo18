@@ -297,9 +297,8 @@ class ResPartnerMemberRegistrationCorrection(models.Model):
             ),
         ]
 
-        self._log_club_kardex_event(
+        self.env["club.kardex.event"]._log_registration_error_correction(  # pylint: disable=protected-access
             self,
-            "member_registration_error_corrected",
             self.env._("Alta errónea de Socio corregida a vínculo de Beneficiario."),
             old_value="\n".join(old_value_lines),
             new_value="\n".join(new_value_lines),
@@ -341,88 +340,75 @@ class ResPartnerMemberRegistrationCorrection(models.Model):
 
         snapshot = self._get_registration_error_snapshot(certificate)
 
-        if certificate:
-            # Método privado intencional: solo lo invoca este proceso controlado.
-            certificate._action_void_registration_error(  # pylint: disable=protected-access
-                normalized_reason
+        with self.env.cr.savepoint():
+            if certificate:
+                # Método privado intencional: solo lo invoca este proceso controlado.
+                certificate._action_void_registration_error(  # pylint: disable=protected-access
+                    normalized_reason
+                )
+
+            membership_period = self.env["club.membership.period"].search(
+                [
+                    ("person_id", "=", self.id),
+                    ("state", "=", "current"),
+                ],
+                limit=1,
             )
 
-        if self.club_member_state != "inactive":
-            # El helper protegido se comparte intencionalmente entre
-            # extensiones controladas del mismo modelo res.partner.
+            if membership_period:
+                # Método protegido intencional: solo este flujo controlado
+                # puede invalidar una membresía originada por alta errónea.
+                membership_period._void_period_internal(  # pylint: disable=protected-access
+                    normalized_reason
+                )
+
+            # La condición de Socio se elimina antes de crear el vínculo
+            # de Beneficiario para respetar la exclusividad estricta de
+            # roles actuales.
             # pylint: disable=protected-access
             self.with_context(
                 club_member_registration_correction_token=(
                     _MEMBER_REGISTRATION_CORRECTION_TOKEN
                 )
-            )._write_club_member_state_internal(
-                "inactive",
-                reason=normalized_reason,
-                origin="manual",
+            )._write_club_member_values_internal(
+                {
+                    "club_person_type": False,
+                    "club_member_state": False,
+                    "club_legal_state": False,
+                    "club_join_date": False,
+                }
             )
             # pylint: enable=protected-access
 
-        beneficiary = self.env["club.beneficiary"].create(
-            {
-                "person_id": self.id,
-                "member_id": target_member.id,
-                "relationship": relationship,
-                "relationship_detail": (
-                    normalized_relationship_detail
-                    if relationship == "family_dependent"
-                    else False
-                ),
-                "special_condition": special_condition,
-                "start_date": start_date,
-            }
-        )
-
-        correction = self.env["club.member.registration.correction"]._log_event(  # pylint: disable=protected-access
-            self,
-            beneficiary,
-            normalized_reason,
-            certificate=certificate,
-            snapshot=snapshot,
-        )
-
-        self._log_member_registration_error_kardex(
-            target_member=target_member,
-            beneficiary=beneficiary,
-            certificate=certificate,
-            snapshot=snapshot,
-            reason=normalized_reason,
-        )
-
-        membership_period = self.env["club.membership.period"].search(
-            [
-                ("person_id", "=", self.id),
-                ("state", "=", "current"),
-            ],
-            limit=1,
-        )
-
-        if membership_period:
-            # Método protegido intencional: solo este flujo controlado
-            # puede invalidar una membresía originada por alta errónea.
-            membership_period._void_period_internal(  # pylint: disable=protected-access
-                normalized_reason
+            beneficiary = self.env["club.beneficiary"].create(
+                {
+                    "person_id": self.id,
+                    "member_id": target_member.id,
+                    "relationship": relationship,
+                    "relationship_detail": (
+                        normalized_relationship_detail
+                        if relationship == "family_dependent"
+                        else False
+                    ),
+                    "special_condition": special_condition,
+                    "start_date": start_date,
+                }
             )
 
-        # El helper protegido se comparte intencionalmente entre
-        # extensiones controladas del mismo modelo res.partner.
-        # pylint: disable=protected-access
-        self.with_context(
-            club_member_registration_correction_token=(
-                _MEMBER_REGISTRATION_CORRECTION_TOKEN
+            correction = self.env["club.member.registration.correction"]._log_event(  # pylint: disable=protected-access
+                self,
+                beneficiary,
+                normalized_reason,
+                certificate=certificate,
+                snapshot=snapshot,
             )
-        )._write_club_member_values_internal(
-            {
-                "club_person_type": False,
-                "club_member_state": False,
-                "club_legal_state": False,
-                "club_join_date": False,
-            }
-        )
-        # pylint: enable=protected-access
+
+            self._log_member_registration_error_kardex(
+                target_member=target_member,
+                beneficiary=beneficiary,
+                certificate=certificate,
+                snapshot=snapshot,
+                reason=normalized_reason,
+            )
 
         return beneficiary, correction

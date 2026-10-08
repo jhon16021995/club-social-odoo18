@@ -291,16 +291,12 @@ class ResPartner(models.Model):
                     )
                 )
 
-            if (
-                partner.club_person_type == "member"
-                and partner.club_member_state != "inactive"
-            ):
+            if partner.club_person_type == "member":
                 raise ValidationError(
                     self.env._(
-                        "Un Socio con un vínculo vigente como "
-                        "Beneficiario debe permanecer Pasivo. "
-                        "Finalice primero el vínculo de Beneficiario "
-                        "antes de reactivar al Socio."
+                        "Una persona con un vínculo vigente como "
+                        "Beneficiario no puede ser Socio, incluso "
+                        "si el Socio se encuentra Pasivo."
                     )
                 )
 
