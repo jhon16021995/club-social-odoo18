@@ -60,6 +60,10 @@ class ClubKardexEvent(models.Model):
                 "Cambio de fecha de ingreso",
             ),
             (
+                "member_historical_contributions_changed",
+                "Cambio de Aportes Ordinarios Pagados históricos",
+            ),
+            (
                 "member_state_changed",
                 "Cambio de estado del asociado",
             ),

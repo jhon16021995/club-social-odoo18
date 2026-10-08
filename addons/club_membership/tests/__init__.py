@@ -14,6 +14,7 @@ from . import (
     test_former_member_ui,
     test_kardex_person_history_ui,
     test_member_definitive_end,
+    test_member_lifetime,
     test_member_reactivation,
     test_member_reentry,
     test_member_reentry_ui,

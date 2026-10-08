@@ -9,6 +9,7 @@ from . import (
     membership_period,
     person_audit,
     res_partner,
+    res_partner_member_lifetime,
     res_partner_client_to_beneficiary_conversion,
     res_partner_client_to_member_conversion,
     beneficiary_to_client_conversion,
