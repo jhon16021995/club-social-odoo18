@@ -52,14 +52,17 @@ class TestMemberReactivation(TransactionCase):
         state="active",
         join_date=False,
     ):
+        lifetime = state == "lifetime"
+
         vals = {
             "name": name,
             "company_type": "person",
             "is_company": False,
             "club_person_type": "member",
             "club_id_number": cls._next_available_id_number(start_number),
-            "club_birthdate": cls._birthdate_for_age(50),
+            "club_birthdate": cls._birthdate_for_age(60 if lifetime else 50),
             "club_member_state": state,
+            "club_ordinary_contributions_historical_paid": (360 if lifetime else 0),
         }
 
         if join_date:

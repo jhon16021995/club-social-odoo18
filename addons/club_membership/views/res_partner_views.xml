@@ -315,6 +315,20 @@
                                 name="club_seniority"
                                 readonly="1"
                             />
+
+                            <field
+                                name="club_ordinary_contributions_historical_paid"
+                            />
+
+                            <field
+                                name="club_ordinary_contributions_paid_total"
+                                readonly="1"
+                            />
+
+                            <field
+                                name="club_lifetime_eligible"
+                                readonly="1"
+                            />
                         </group>
 
                         <group>
