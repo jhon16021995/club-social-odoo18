@@ -8,6 +8,24 @@
             ref="view_partner_form_club_membership"
         />
         <field name="arch" type="xml">
+            <xpath expr="//notebook" position="attributes">
+                <attribute name="invisible">club_person_type != 'member' and not club_kardex_event_ids</attribute>
+            </xpath>
+
+            <xpath
+                expr="//page[@name='club_beneficiaries']"
+                position="attributes"
+            >
+                <attribute name="invisible">club_person_type != 'member'</attribute>
+            </xpath>
+
+            <xpath
+                expr="//page[@name='club_beneficiary_person_history']"
+                position="attributes"
+            >
+                <attribute name="invisible">club_person_type != 'member'</attribute>
+            </xpath>
+
             <xpath expr="//notebook" position="inside">
                 <page
                     string="Kardex / Historial"

@@ -171,10 +171,8 @@ class TestMemberReentryUI(TransactionCase):
             99710000300,
         )
 
-        former.write(
-            {
-                "club_person_type": "client",
-            }
+        former.action_convert_former_member_to_client(
+            "Preparación controlada de Cliente histórico para prueba UI de Reingreso."
         )
 
         former.invalidate_recordset()

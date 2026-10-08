@@ -70,6 +70,10 @@ class ClubKardexEvent(models.Model):
                 "Reingreso como Socio",
             ),
             (
+                "former_member_converted_to_client",
+                "Ex-Socio convertido en Cliente",
+            ),
+            (
                 "member_legal_state_changed",
                 "Cambio de estado legal",
             ),

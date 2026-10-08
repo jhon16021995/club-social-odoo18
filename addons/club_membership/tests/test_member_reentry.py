@@ -348,10 +348,8 @@ class TestMemberReentry(TransactionCase):
             99700001200,
         )
 
-        member.write(
-            {
-                "club_person_type": "client",
-            }
+        member.action_convert_former_member_to_client(
+            "Preparación controlada de Cliente histórico para validar MEM-15."
         )
 
         member.invalidate_recordset()
