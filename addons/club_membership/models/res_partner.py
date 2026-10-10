@@ -880,6 +880,9 @@ class ResPartner(models.Model):
                 origin=(
                     self.env.context.get("club_member_state_change_origin") or "manual"
                 ),
+                effective_date=effective_date or False,
+                member_state_from=before_values.get("_club_member_state_code") or False,
+                member_state_to=partner.club_member_state or False,
             )
 
     @api.model_create_multi
@@ -972,6 +975,7 @@ class ResPartner(models.Model):
 
             if was_member or new_person_type == "member":
                 before_values = self._get_club_kardex_snapshot(partner)
+                before_values["_club_member_state_code"] = partner.club_member_state
 
             partner_vals = dict(vals)
 

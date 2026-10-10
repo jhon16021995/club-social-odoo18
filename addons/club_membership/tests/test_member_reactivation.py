@@ -330,6 +330,18 @@ class TestMemberReactivation(TransactionCase):
             limit=1,
         )
 
+        self.assertEqual(
+            reactivation_event.effective_date,
+            today,
+        )
+        self.assertEqual(
+            reactivation_event.member_state_from,
+            "inactive",
+        )
+        self.assertEqual(
+            reactivation_event.member_state_to,
+            "lifetime",
+        )
         self.assertIn(
             "Corrección de fallecimiento",
             reactivation_event.reason or "",

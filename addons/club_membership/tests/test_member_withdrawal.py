@@ -267,8 +267,22 @@ class TestMemberWithdrawal(TransactionCase):
         )
 
         self.assertTrue(member_event)
-        self.assertEqual(member_event.origin, "manual")
-        self.assertEqual(member_event.user_id, self.admin)
+        self.assertEqual(
+            (
+                member_event.origin,
+                member_event.user_id,
+                member_event.effective_date,
+                member_event.member_state_from,
+                member_event.member_state_to,
+            ),
+            (
+                "manual",
+                self.admin,
+                today,
+                "active",
+                "inactive",
+            ),
+        )
         self.assertIn(reason, member_event.reason or "")
 
         self.assertTrue(certificate_event)

@@ -51,6 +51,7 @@ class ResPartnerMemberReentry(models.Model):
                 "start_date": effective_date,
                 "origin": "reentry",
                 "member_code": self.club_member_code,
+                "opening_member_state": self.club_member_state,
             }
         )
 

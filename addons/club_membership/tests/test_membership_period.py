@@ -222,6 +222,7 @@ class TestMembershipPeriod(TransactionCase):
         self.assertEqual(periods.origin, "initial")
         self.assertEqual(periods.start_date, member.club_join_date)
         self.assertEqual(periods.member_code, member.club_member_code)
+        self.assertEqual(periods.opening_member_state, "active")
 
     def test_beneficiary_conversion_builds_initial_current_period(self):
         admin = self.env.ref("base.user_admin")
@@ -273,3 +274,4 @@ class TestMembershipPeriod(TransactionCase):
         self.assertEqual(periods.origin, "initial")
         self.assertEqual(periods.start_date, person.club_join_date)
         self.assertEqual(periods.member_code, person.club_member_code)
+        self.assertEqual(periods.opening_member_state, "active")
