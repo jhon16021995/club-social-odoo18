@@ -347,17 +347,44 @@ class TestMemberWithdrawal(TransactionCase):
                 effective_date=today,
             )
 
-    def test_direct_passive_state_transitions_are_blocked(self):
+    def test_direct_member_state_transitions_are_blocked(self):
         active_member = self._create_member(
-            name="Socio paso directo a Pasivo",
+            name="Socio cambio directo de estado",
             start_number=99500000800,
             state="active",
         )
 
+        for target_state in (
+            "inactive",
+            "absent",
+            "temporary",
+            "active_arrears",
+        ):
+            with self.subTest(target_state=target_state):
+                with self.assertRaises(ValidationError):
+                    active_member.write(
+                        {
+                            "club_member_state": target_state,
+                        }
+                    )
+
+        lifetime_eligible_member = self.Partner.create(
+            {
+                "name": "Socio cambio directo a Vitalicio",
+                "company_type": "person",
+                "is_company": False,
+                "club_person_type": "member",
+                "club_id_number": self._next_available_id_number(99500000850),
+                "club_birthdate": self._birthdate_for_age(60),
+                "club_member_state": "active",
+                "club_ordinary_contributions_historical_paid": 360,
+            }
+        )
+
         with self.assertRaises(ValidationError):
-            active_member.write(
+            lifetime_eligible_member.write(
                 {
-                    "club_member_state": "inactive",
+                    "club_member_state": "lifetime",
                 }
             )
 

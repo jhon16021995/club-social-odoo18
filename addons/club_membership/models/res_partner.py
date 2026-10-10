@@ -924,26 +924,12 @@ class ResPartner(models.Model):
                 if partner.club_person_type != "member":
                     continue
 
-                if (
-                    requested_member_state == "inactive"
-                    and partner.club_member_state != "inactive"
-                ):
+                if requested_member_state != partner.club_member_state:
                     raise ValidationError(
                         self.env._(
-                            "Para pasar un Socio a Pasivo debe utilizar "
-                            "la acción controlada Retirar / dar de baja Socio."
-                        )
-                    )
-
-                if (
-                    partner.club_member_state == "inactive"
-                    and requested_member_state != "inactive"
-                ):
-                    raise ValidationError(
-                        self.env._(
-                            "Un Socio Pasivo no puede reactivarse "
-                            "mediante edición directa. La reactivación "
-                            "requiere un proceso controlado específico."
+                            "El estado del asociado no puede modificarse "
+                            "mediante edición directa. Debe utilizar el "
+                            "proceso controlado correspondiente."
                         )
                     )
 
