@@ -509,6 +509,7 @@ class TestMemberReentry(TransactionCase):
         self.assertEqual(new_period.state, "current")
         self.assertEqual(new_period.origin, "reentry")
         self.assertEqual(new_period.start_date, effective_date)
+        self.assertEqual(new_period.opening_member_state, "active")
 
         self.assertEqual(member.club_person_type, "member")
         self.assertEqual(member.club_member_code, member.club_id_number)

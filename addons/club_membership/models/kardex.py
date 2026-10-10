@@ -28,6 +28,41 @@ class ClubKardexEvent(models.Model):
         default=fields.Datetime.now,
     )
 
+    effective_date = fields.Date(
+        string="Fecha efectiva",
+        readonly=True,
+        index=True,
+        copy=False,
+    )
+
+    member_state_from = fields.Selection(
+        selection=[
+            ("active", "Activo"),
+            ("active_arrears", "Activo en mora"),
+            ("lifetime", "Vitalicio"),
+            ("absent", "Ausente"),
+            ("temporary", "Transitorio"),
+            ("inactive", "Pasivo"),
+        ],
+        string="Estado anterior del asociado",
+        readonly=True,
+        copy=False,
+    )
+
+    member_state_to = fields.Selection(
+        selection=[
+            ("active", "Activo"),
+            ("active_arrears", "Activo en mora"),
+            ("lifetime", "Vitalicio"),
+            ("absent", "Ausente"),
+            ("temporary", "Transitorio"),
+            ("inactive", "Pasivo"),
+        ],
+        string="Estado nuevo del asociado",
+        readonly=True,
+        copy=False,
+    )
+
     user_id = fields.Many2one(
         comodel_name="res.users",
         string="Usuario",
@@ -320,6 +355,13 @@ class ClubKardexEvent(models.Model):
             "old_value": (event_data.get("old_value") or False),
             "new_value": (event_data.get("new_value") or False),
             "reason": (event_data.get("reason") or False),
+            "effective_date": (
+                fields.Date.to_date(event_data.get("effective_date"))
+                if event_data.get("effective_date")
+                else False
+            ),
+            "member_state_from": (event_data.get("member_state_from") or False),
+            "member_state_to": (event_data.get("member_state_to") or False),
             "beneficiary_id": (beneficiary.id if beneficiary else False),
             "certificate_id": (certificate.id if certificate else False),
             "person_audit_event_id": (

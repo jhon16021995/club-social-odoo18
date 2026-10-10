@@ -49,6 +49,21 @@ class ClubMembershipPeriod(models.Model):
         copy=False,
     )
 
+    opening_member_state = fields.Selection(
+        selection=[
+            ("active", "Activo"),
+            ("active_arrears", "Activo en mora"),
+            ("lifetime", "Vitalicio"),
+            ("absent", "Ausente"),
+            ("temporary", "Transitorio"),
+            ("inactive", "Pasivo"),
+        ],
+        string="Estado del asociado al inicio",
+        readonly=True,
+        index=True,
+        copy=False,
+    )
+
     end_reason = fields.Text(
         string="Motivo de finalización",
         readonly=True,

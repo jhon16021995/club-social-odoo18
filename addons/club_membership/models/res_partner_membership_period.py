@@ -69,6 +69,7 @@ class ResPartnerMembershipPeriod(models.Model):
                 "start_date": self.club_join_date,
                 "origin": "initial",
                 "member_code": self.club_member_code,
+                "opening_member_state": self.club_member_state,
             }
         )
 

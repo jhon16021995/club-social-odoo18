@@ -880,6 +880,9 @@ class ResPartner(models.Model):
                 origin=(
                     self.env.context.get("club_member_state_change_origin") or "manual"
                 ),
+                effective_date=effective_date or False,
+                member_state_from=before_values.get("_club_member_state_code") or False,
+                member_state_to=partner.club_member_state or False,
             )
 
     @api.model_create_multi
@@ -921,26 +924,12 @@ class ResPartner(models.Model):
                 if partner.club_person_type != "member":
                     continue
 
-                if (
-                    requested_member_state == "inactive"
-                    and partner.club_member_state != "inactive"
-                ):
+                if requested_member_state != partner.club_member_state:
                     raise ValidationError(
                         self.env._(
-                            "Para pasar un Socio a Pasivo debe utilizar "
-                            "la acción controlada Retirar / dar de baja Socio."
-                        )
-                    )
-
-                if (
-                    partner.club_member_state == "inactive"
-                    and requested_member_state != "inactive"
-                ):
-                    raise ValidationError(
-                        self.env._(
-                            "Un Socio Pasivo no puede reactivarse "
-                            "mediante edición directa. La reactivación "
-                            "requiere un proceso controlado específico."
+                            "El estado del asociado no puede modificarse "
+                            "mediante edición directa. Debe utilizar el "
+                            "proceso controlado correspondiente."
                         )
                     )
 
@@ -972,6 +961,7 @@ class ResPartner(models.Model):
 
             if was_member or new_person_type == "member":
                 before_values = self._get_club_kardex_snapshot(partner)
+                before_values["_club_member_state_code"] = partner.club_member_state
 
             partner_vals = dict(vals)
 
