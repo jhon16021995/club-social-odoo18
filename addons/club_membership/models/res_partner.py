@@ -443,7 +443,9 @@ class ResPartner(models.Model):
                 }
             )
 
-        certificate = self.club_certificate_ids[:1]
+        certificate = self.club_certificate_ids.filtered(
+            lambda cert: cert.state == "active"
+        )
 
         if certificate and certificate.state == "active":
             certificate._write_member_withdrawal_values_internal(  # pylint: disable=protected-access

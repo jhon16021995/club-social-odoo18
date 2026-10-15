@@ -1,6 +1,6 @@
 {
     "name": "Club Social - Membership",
-    "version": "18.0.1.0.0",
+    "version": "18.0.1.1.0",
     "summary": "Gestión administrativa de socios del Club Social Petrolero Polanco",
     "category": "Services",
     "author": "Club Social Petrolero Polanco",
@@ -19,6 +19,8 @@
         "views/member_registration_correction_wizard_views.xml",
         "views/member_withdrawal_wizard_views.xml",
         "views/member_reactivation_wizard_views.xml",
+        "views/member_absence_wizard_views.xml",
+        "views/member_absence_return_wizard_views.xml",
         "views/member_reentry_wizard_views.xml",
         "views/client_to_beneficiary_wizard_views.xml",
         "views/client_to_member_wizard_views.xml",

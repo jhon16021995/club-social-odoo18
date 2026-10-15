@@ -100,7 +100,24 @@ class ClubMemberRegistrationCorrectionWizard(models.TransientModel):
     @api.depends("member_id")
     def _compute_certificate_id(self):
         for wizard in self:
-            wizard.certificate_id = wizard.member_id.club_certificate_ids[:1]
+            certificates = wizard.member_id.club_certificate_ids
+            if len(certificates) == 1 and certificates.state != "active":
+                raise ValidationError(
+                    self.env._(
+                        "El Certificado histórico no está Activo; no puede anularse por alta errónea."
+                    )
+                )
+
+            if len(certificates) > 1:
+                raise ValidationError(
+                    self.env._(
+                        "La Persona tiene más de un Certificado "
+                        "Patrimonial. Debe revisar esta inconsistencia "
+                        "antes de continuar."
+                    )
+                )
+
+            wizard.certificate_id = certificates
 
     @api.depends("member_id")
     def _compute_current_beneficiary_count(self):

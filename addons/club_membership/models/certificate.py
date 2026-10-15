@@ -1,10 +1,15 @@
 from odoo import api, fields, models
 from odoo.exceptions import AccessError, ValidationError
 from odoo.tools import float_is_zero
+from odoo.tools.sql import index_exists
 
 _REGISTRATION_ERROR_VOID_TOKEN = object()
 _CERTIFICATE_MEMBER_WITHDRAWAL_INTERNAL_TOKEN = object()
 _CERTIFICATE_MEMBERSHIP_END_INTERNAL_TOKEN = object()
+_ACTIVE_CERTIFICATE_UNIQUE_INDEX = "club_certificate_club_certificate_member_unique"
+
+
+_CERTIFICATE_TRANSFER_CREATE_INTERNAL_TOKEN = object()
 
 
 class ClubCertificate(models.Model):
@@ -42,6 +47,7 @@ class ClubCertificate(models.Model):
         selection=[
             ("new", "Nuevo"),
             ("migrated", "Migrado"),
+            ("transfer_received", "Recibido por transferencia"),
         ],
         string="Origen del registro",
         required=True,
@@ -51,6 +57,19 @@ class ClubCertificate(models.Model):
             "Nuevo: certificado emitido dentro del nuevo sistema. "
             "Migrado: certificado que ya existía antes de la puesta "
             "en marcha del sistema."
+        ),
+    )
+
+    transfer_source_certificate_id = fields.Many2one(
+        comodel_name="club.certificate",
+        string="Certificado original de la transferencia",
+        ondelete="restrict",
+        index=True,
+        copy=False,
+        readonly=True,
+        help=(
+            "Referencia al Certificado Patrimonial original "
+            "del que proviene el derecho recibido por transferencia."
         ),
     )
 
@@ -161,10 +180,28 @@ class ClubCertificate(models.Model):
     _sql_constraints = [
         (
             "club_certificate_member_unique",
-            "unique(member_id)",
-            "Cada socio puede tener un solo Certificado Patrimonial.",
+            "",
+            "Un socio no puede tener más de un Certificado Patrimonial activo.",
         ),
     ]
+
+    def init(self):
+        result = super().init()
+
+        if not index_exists(
+            self.env.cr,
+            _ACTIVE_CERTIFICATE_UNIQUE_INDEX,
+        ):
+            self.env.cr.execute(
+                """
+                CREATE UNIQUE INDEX
+                    club_certificate_club_certificate_member_unique
+                ON club_certificate(member_id)
+                WHERE state = 'active'
+                """
+            )
+
+        return result
 
     @api.onchange("registration_origin", "total_value")
     def _onchange_registration_origin_total_value(self):
@@ -172,13 +209,20 @@ class ClubCertificate(models.Model):
             if certificate.registration_origin == "new":
                 certificate.opening_balance = certificate.total_value
 
-    @api.depends("total_value", "opening_balance")
+    @api.depends(
+        "registration_origin",
+        "total_value",
+        "opening_balance",
+    )
     def _compute_opening_paid_amount(self):
         for certificate in self:
-            certificate.opening_paid_amount = max(
-                certificate.total_value - certificate.opening_balance,
-                0.0,
-            )
+            if certificate.registration_origin == "transfer_received":
+                certificate.opening_paid_amount = 0.0
+            else:
+                certificate.opening_paid_amount = max(
+                    certificate.total_value - certificate.opening_balance,
+                    0.0,
+                )
 
     @api.depends("opening_balance")
     def _compute_certificate_type(self):
@@ -409,12 +453,133 @@ class ClubCertificate(models.Model):
             origin="manual",
         )
 
+    def _raise_active_certificate_conflict(self):
+        raise ValidationError(
+            self.env._(
+                "El socio ya tiene un Certificado Patrimonial activo. "
+                "Puede conservar Certificados históricos, pero solo uno "
+                "puede estar vigente al mismo tiempo."
+            )
+        )
+
+    @api.model
+    def _check_no_temporary_active_certificate(self, member_ids):
+        """Impedir certificados activos a titulares Transitorios."""
+        if not member_ids:
+            return
+
+        temporary_members = (
+            self.env["res.partner"]
+            .browse(member_ids)
+            .filtered(lambda member: member.club_member_state == "temporary")
+        )
+
+        if temporary_members:
+            raise ValidationError(
+                self.env._(
+                    "Un Socio Transitorio no puede tener un "
+                    "Certificado Patrimonial activo."
+                )
+            )
+
+    @api.model
+    def _check_active_certificate_create_values(self, vals_list):
+        active_member_ids = []
+
+        for vals in vals_list:
+            if vals.get("state", "active") != "active":
+                continue
+
+            member_id = vals.get("member_id")
+
+            if member_id:
+                active_member_ids.append(member_id)
+
+        if not active_member_ids:
+            return
+
+        self._check_no_temporary_active_certificate(active_member_ids)
+
+        if len(active_member_ids) != len(set(active_member_ids)):
+            self._raise_active_certificate_conflict()
+
+        existing_certificate = self.search(
+            [
+                ("member_id", "in", active_member_ids),
+                ("state", "=", "active"),
+            ],
+            limit=1,
+        )
+
+        if existing_certificate:
+            self._raise_active_certificate_conflict()
+
+    def _check_active_certificate_write_values(self, vals):
+        if vals.get("state") != "active":
+            return
+
+        member_ids = self.mapped("member_id").ids
+
+        self._check_no_temporary_active_certificate(member_ids)
+
+        if len(member_ids) != len(set(member_ids)):
+            self._raise_active_certificate_conflict()
+
+        existing_certificate = self.search(
+            [
+                ("member_id", "in", member_ids),
+                ("state", "=", "active"),
+                ("id", "not in", self.ids),
+            ],
+            limit=1,
+        )
+
+        if existing_certificate:
+            self._raise_active_certificate_conflict()
+
     @api.model_create_multi
     def create(self, vals_list):
         prepared_vals_list = []
 
         for original_vals in vals_list:
             vals = dict(original_vals)
+
+            # Solo el futuro proceso interno autorizado podrá crear
+            # certificados recibidos y enlazarlos con el original.
+            internal_transfer_create = (
+                self.env.context.get("club_certificate_transfer_create_internal_token")
+                is _CERTIFICATE_TRANSFER_CREATE_INTERNAL_TOKEN
+            )
+
+            if (
+                vals.get("registration_origin") == "transfer_received"
+                or "transfer_source_certificate_id" in vals
+            ) and not internal_transfer_create:
+                raise AccessError(
+                    self.env._(
+                        "Un Certificado recibido por transferencia "
+                        "solo puede registrarse mediante el proceso "
+                        "institucional autorizado."
+                    )
+                )
+
+            if "passive_by_member_withdrawal" in vals:
+                raise AccessError(
+                    self.env._(
+                        "La marca técnica de Certificado Pasivo por retiro "
+                        "solo puede establecerse mediante el proceso "
+                        "controlado del sistema."
+                    )
+                )
+
+            if "passive_by_membership_end" in vals:
+                raise AccessError(
+                    self.env._(
+                        "La marca técnica de Certificado Pasivo por baja "
+                        "definitiva solo puede establecerse mediante el "
+                        "proceso controlado del sistema."
+                    )
+                )
 
             if vals.get("registration_origin", "new") == "new":
                 vals["opening_balance"] = vals.get(
@@ -423,6 +588,8 @@ class ClubCertificate(models.Model):
                 )
 
             prepared_vals_list.append(vals)
+
+        self._check_active_certificate_create_values(prepared_vals_list)
 
         certificates = super().create(prepared_vals_list)
 
@@ -454,6 +621,13 @@ class ClubCertificate(models.Model):
         if self.state == "registration_error_void":
             raise ValidationError(
                 self.env._("Este Certificado ya fue anulado por alta errónea.")
+            )
+
+        if self.state != "active":
+            raise ValidationError(
+                self.env._(
+                    "Solo un Certificado Activo puede anularse por alta errónea."
+                )
             )
 
         if self.member_id.club_person_type != "member":
@@ -570,6 +744,18 @@ class ClubCertificate(models.Model):
     def write(self, vals):
         vals = dict(vals)
 
+        # La referencia al Certificado de origen se fija
+        # exclusivamente durante la creación autorizada.
+        # Nunca debe modificarse después.
+        if "transfer_source_certificate_id" in vals:
+            raise AccessError(
+                self.env._(
+                    "La referencia al Certificado Patrimonial "
+                    "original de una transferencia es histórica "
+                    "y no puede modificarse directamente."
+                )
+            )
+
         internal_member_withdrawal_write = (
             self.env.context.get("club_certificate_member_withdrawal_internal_token")
             is _CERTIFICATE_MEMBER_WITHDRAWAL_INTERNAL_TOKEN
@@ -653,6 +839,8 @@ class ClubCertificate(models.Model):
                             "no puede cambiarse después de registrarlo."
                         )
                     )
+
+        self._check_active_certificate_write_values(vals)
 
         for certificate in self:
             before_values = self._get_kardex_snapshot(certificate)
