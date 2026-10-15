@@ -102,7 +102,18 @@ class ClubMemberReactivationWizard(models.TransientModel):
                 wizard.preserved_blocked_beneficiary_count = 0
                 continue
 
-            certificate = member.club_certificate_ids[:1]
+            certificate = member.club_certificate_ids.filtered(
+                "passive_by_member_withdrawal"
+            )
+
+            if len(certificate) > 1:
+                raise ValidationError(
+                    self.env._(
+                        "Existen varios Certificados Patrimoniales marcados "
+                        "por retiro del Socio. Debe regularizarse el historial "
+                        "antes de ejecutar la reactivación."
+                    )
+                )
             wizard.certificate_id = certificate
 
             wizard.certificate_will_reactivate = bool(

@@ -225,7 +225,16 @@ class ResPartnerMemberReactivation(models.Model):
                 )
             )
 
-        certificate = self.club_certificate_ids[:1]
+        certificate = self.club_certificate_ids.filtered("passive_by_member_withdrawal")
+
+        if len(certificate) > 1:
+            raise ValidationError(
+                self.env._(
+                    "Existen varios Certificados Patrimoniales marcados "
+                    "por retiro del Socio. Debe regularizarse el historial "
+                    "antes de ejecutar la reactivación."
+                )
+            )
 
         if (
             certificate
@@ -236,6 +245,20 @@ class ResPartnerMemberReactivation(models.Model):
                 self.env._(
                     "El Certificado Patrimonial tiene una inconsistencia: "
                     "figura marcado por retiro del Socio pero no está Pasivo."
+                )
+            )
+
+        # Un retorno a Transitorio no debe restaurar un Certificado activo.
+        # Tambien se rechaza un historial ya activo mientras el socio figura Pasivo.
+        if target_state == "temporary" and (
+            certificate
+            or self.club_certificate_ids.filtered(lambda cert: cert.state == "active")
+        ):
+            raise ValidationError(
+                self.env._(
+                    "Un Socio Transitorio no puede reactivarse con un "
+                    "Certificado Patrimonial activo o marcado por retiro. "
+                    "Regularice el historial antes de reactivarlo."
                 )
             )
 

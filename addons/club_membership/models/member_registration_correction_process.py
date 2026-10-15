@@ -225,7 +225,39 @@ class ResPartnerMemberRegistrationCorrection(models.Model):
                 self.env._("Debe indicar el motivo de la corrección de alta errónea.")
             )
 
+        # CAU-08: comprobar la causalidad antes de alterar
+        # Certificado, periodo o condicion de Socio.
+        current_periods = self.env["club.membership.period"].search(
+            [
+                ("person_id", "=", self.id),
+                ("state", "=", "current"),
+            ],
+            limit=2,
+        )
+        if len(current_periods) != 1:
+            raise ValidationError(
+                self.env._(
+                    "No se identifico un unico periodo de membresia "
+                    "vigente. Revise el historial antes de corregir el alta."
+                )
+            )
+
+        if current_periods.origin == "reentry":
+            raise ValidationError(
+                self.env._(
+                    "Esta Persona tiene un Reingreso legitimo registrado. "
+                    "No puede anularse automaticamente mediante la "
+                    "correccion de alta erronea. Revise el historial."
+                )
+            )
+
         certificates = self.club_certificate_ids
+        if len(certificates) == 1 and certificates.state != "active":
+            raise ValidationError(
+                self.env._(
+                    "El Certificado histórico no está Activo; no puede anularse por alta errónea."
+                )
+            )
 
         if len(certificates) > 1:
             raise ValidationError(
@@ -336,7 +368,8 @@ class ResPartnerMemberRegistrationCorrection(models.Model):
         if not start_date:
             start_date = fields.Date.context_today(self)
 
-        certificate = self.club_certificate_ids[:1]
+        # La validacion previa garantiza como maximo un Certificado.
+        certificate = self.club_certificate_ids
 
         snapshot = self._get_registration_error_snapshot(certificate)
 

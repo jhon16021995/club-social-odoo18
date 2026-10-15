@@ -16,6 +16,7 @@ from . import (
     res_partner_former_member_to_client_conversion,
     res_partner_former_member_to_beneficiary_conversion,
     res_partner_identity,
+    res_partner_member_absence,
     res_partner_member_reactivation,
     res_partner_membership_end,
     res_partner_membership_period,
@@ -33,4 +34,6 @@ from . import res_partner_member_reentry
 # de corrección de alta errónea de Socio.
 # isort: off
 from . import member_registration_correction_process
+
 # isort: on
+from . import certificate_transfer

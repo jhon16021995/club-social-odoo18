@@ -73,7 +73,23 @@ class ClubMembershipEndWizard(models.TransientModel):
                 wizard.blocked_beneficiary_count = 0
                 continue
 
-            wizard.certificate_id = member.club_certificate_ids[:1]
+            eligible_certificates = member.club_certificate_ids.filtered(
+                lambda cert: (
+                    cert.state == "active"
+                    or (cert.state == "passive" and cert.passive_by_member_withdrawal)
+                )
+            )
+
+            if len(eligible_certificates) > 1:
+                raise ValidationError(
+                    self.env._(
+                        "Existen varios Certificados Patrimoniales elegibles "
+                        "para baja definitiva. Debe regularizarse el historial "
+                        "antes de continuar."
+                    )
+                )
+
+            wizard.certificate_id = eligible_certificates
 
             wizard.active_beneficiary_count = len(
                 member.club_beneficiary_ids.filtered(

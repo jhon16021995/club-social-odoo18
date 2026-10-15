@@ -99,7 +99,18 @@ class ClubMemberReentryWizard(models.TransientModel):
 
             wizard.last_membership_end_date = last_period.end_date
 
-            certificate = person.club_certificate_ids[:1]
+            certificate = person.club_certificate_ids.filtered(
+                "passive_by_membership_end"
+            )
+
+            if len(certificate) > 1:
+                raise ValidationError(
+                    self.env._(
+                        "Existen varios Certificados Patrimoniales marcados "
+                        "por baja definitiva. Debe regularizarse el historial "
+                        "antes de ejecutar el Reingreso."
+                    )
+                )
             wizard.certificate_id = certificate
             wizard.certificate_will_reactivate = bool(
                 certificate

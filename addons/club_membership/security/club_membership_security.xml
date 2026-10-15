@@ -65,6 +65,14 @@
         />
     </record>
 
+    <record id="group_club_member_absence" model="res.groups">
+        <field name="name">Registrar ausencia y retorno de Socio</field>
+        <field
+            name="category_id"
+            ref="club_membership.module_category_club_social"
+        />
+    </record>
+
     <record id="group_club_member_reactivation" model="res.groups">
         <field name="name">Reactivar Socio Pasivo</field>
         <field
@@ -281,6 +289,27 @@
                 )
             ]"
         />
+    </record>
+
+
+    <!-- Verificacion documental de pago patrimonial.
+         Este grupo no concede acceso directo al modelo. -->
+    <record
+        id="group_club_certificate_payment_verification"
+        model="res.groups"
+    >
+        <field name="name">
+            Verificar pago de Certificado Patrimonial
+        </field>
+    </record>
+
+    <record id="group_club_certificate_transfer_authorization" model="res.groups">
+        <field name="name">Autorizar transferencia patrimonial</field>
+    </record>
+
+    <record id="group_club_certificate_transfer_cancellation" model="res.groups">
+        <field name="name">Responsable de cancelacion de transferencias patrimoniales</field>
+        <field name="comment">Permiso institucional independiente para cancelar tramites patrimoniales mediante un procedimiento controlado.</field>
     </record>
 
 </odoo>

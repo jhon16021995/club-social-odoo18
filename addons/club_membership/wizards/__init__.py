@@ -5,6 +5,8 @@ from . import (
     client_to_member_wizard,
     former_member_to_beneficiary_wizard,
     former_member_to_client_wizard,
+    member_absence_return_wizard,
+    member_absence_wizard,
     member_reactivation_wizard,
     member_reentry_wizard,
     member_registration_correction_wizard,

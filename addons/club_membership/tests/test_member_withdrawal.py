@@ -297,6 +297,74 @@ class TestMemberWithdrawal(TransactionCase):
             beneficiary_event.reason or "",
         )
 
+    def test_withdrawal_selects_active_certificate_among_historical(self):
+        today = fields.Date.context_today(self.Partner)
+
+        member = self._create_member(
+            name="Socio RET con certificados historicos",
+            start_number=99500003000,
+        )
+
+        active_certificate = self._create_certificate(member)
+
+        active_certificate.write(
+            {
+                "issue_date": today - relativedelta(years=2),
+            }
+        )
+
+        historical_certificate = self.Certificate.create(
+            {
+                "member_id": member.id,
+                "registration_origin": "new",
+                "total_value": 1000.0,
+                "opening_balance": 1000.0,
+                "state": "transferred",
+                "issue_date": today,
+            }
+        )
+
+        member.invalidate_recordset(["club_certificate_ids"])
+
+        certificates_by_relation = member.club_certificate_ids
+
+        self.assertEqual(len(certificates_by_relation), 2)
+
+        self.assertEqual(
+            certificates_by_relation[:1],
+            historical_certificate,
+            "El escenario no coloca primero al Certificado histórico.",
+        )
+
+        wizard = self.WithdrawalWizard.create(
+            {
+                "member_id": member.id,
+                "effective_date": today,
+                "reason": "RET con varios certificados historicos",
+            }
+        )
+
+        self.assertEqual(
+            wizard.certificate_id,
+            active_certificate,
+        )
+
+        member.action_withdraw_club_member(
+            "RET con varios certificados historicos",
+            effective_date=today,
+        )
+
+        member.invalidate_recordset()
+        active_certificate.invalidate_recordset()
+        historical_certificate.invalidate_recordset()
+
+        self.assertEqual(member.club_member_state, "inactive")
+        self.assertEqual(active_certificate.state, "passive")
+        self.assertTrue(active_certificate.passive_by_member_withdrawal)
+
+        self.assertEqual(historical_certificate.state, "transferred")
+        self.assertFalse(historical_certificate.passive_by_member_withdrawal)
+
     def test_withdrawal_validations(self):
         today = fields.Date.context_today(self.Partner)
 

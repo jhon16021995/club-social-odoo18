@@ -200,7 +200,23 @@ class ResPartnerMembershipEnd(models.Model):
                 )
             )
 
-        certificate = self.club_certificate_ids[:1]
+        eligible_certificates = self.club_certificate_ids.filtered(
+            lambda cert: (
+                cert.state == "active"
+                or (cert.state == "passive" and cert.passive_by_member_withdrawal)
+            )
+        )
+
+        if len(eligible_certificates) > 1:
+            raise ValidationError(
+                self.env._(
+                    "Existen varios Certificados Patrimoniales elegibles "
+                    "para baja definitiva. Debe regularizarse el historial "
+                    "antes de continuar."
+                )
+            )
+
+        certificate = eligible_certificates
 
         certificate_reason = self.env._(
             "Baja definitiva del Socio titular. "

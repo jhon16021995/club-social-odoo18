@@ -210,7 +210,16 @@ class ResPartnerMemberReentry(models.Model):
                 )
             )
 
-        certificate = self.club_certificate_ids[:1]
+        certificate = self.club_certificate_ids.filtered("passive_by_membership_end")
+
+        if len(certificate) > 1:
+            raise ValidationError(
+                self.env._(
+                    "Existen varios Certificados Patrimoniales marcados "
+                    "por baja definitiva. Debe regularizarse el historial "
+                    "antes de ejecutar el Reingreso."
+                )
+            )
 
         if (
             certificate

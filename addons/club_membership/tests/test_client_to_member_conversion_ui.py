@@ -53,7 +53,7 @@ class TestClientToMemberConversionUI(TransactionCase):
         )
 
     def _prepare_historical_client(self):
-        today = fields.Date.today()
+        today = fields.Date.context_today(self.Partner)
         original_join_date = today - relativedelta(years=5)
 
         person = self.Partner.create(

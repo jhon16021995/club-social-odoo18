@@ -98,6 +98,80 @@ class TestBeneficiaryRules(TransactionCase):
             }
         )
 
+    def test_temporary_company_accepts_worker(self):
+        """Empresa Transitoria puede vincular un trabajador."""
+        from odoo import fields
+
+        Partner = self.env["res.partner"].with_user(self.env.ref("base.user_admin"))
+
+        company = Partner.create(
+            {
+                "name": "Empresa Transitoria TR-09",
+                "company_type": "company",
+                "is_company": True,
+                "club_person_type": "member",
+                "club_member_state": "temporary",
+                "club_id_number": "99720800101",
+                "club_join_date": fields.Date.context_today(Partner),
+            }
+        )
+
+        worker = self._create_person(
+            "Trabajador empresa transitoria TR-09",
+            99720800102,
+            age=35,
+        )
+
+        beneficiary = self._create_beneficiary(
+            worker,
+            relationship="worker",
+            member=company,
+        )
+
+        self.assertEqual(company.club_member_state, "temporary")
+        self.assertEqual(beneficiary.member_id, company)
+        self.assertEqual(beneficiary.person_id, worker)
+        self.assertEqual(beneficiary.relationship, "worker")
+
+    def test_temporary_person_rejects_worker(self):
+        """Transitorio natural no puede asignar vínculo Trabajador."""
+        from dateutil.relativedelta import relativedelta
+        from odoo import fields
+        from odoo.exceptions import ValidationError
+
+        Partner = self.env["res.partner"].with_user(self.env.ref("base.user_admin"))
+        today = fields.Date.context_today(Partner)
+
+        member = Partner.create(
+            {
+                "name": "Persona Transitoria TR-09",
+                "company_type": "person",
+                "is_company": False,
+                "club_person_type": "member",
+                "club_member_state": "temporary",
+                "club_id_number": "99720800103",
+                "club_birthdate": fields.Date.to_string(
+                    today - relativedelta(years=40)
+                ),
+                "club_join_date": today,
+            }
+        )
+
+        worker = self._create_person(
+            "Trabajador no autorizado TR-09",
+            99720800104,
+            age=35,
+        )
+
+        with self.assertRaises(ValidationError):
+            self._create_beneficiary(
+                worker,
+                relationship="worker",
+                member=member,
+            )
+
+        self.assertEqual(member.club_member_state, "temporary")
+
     def test_relationship_and_special_condition_catalog(self):
         relationship_keys = {
             key for key, _label in (self.Beneficiary._fields["relationship"].selection)

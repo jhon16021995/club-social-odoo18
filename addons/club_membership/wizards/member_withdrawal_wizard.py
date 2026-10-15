@@ -85,7 +85,9 @@ class ClubMemberWithdrawalWizard(models.TransientModel):
                 wizard.blocked_beneficiary_count = 0
                 continue
 
-            wizard.certificate_id = member.club_certificate_ids[:1]
+            wizard.certificate_id = member.club_certificate_ids.filtered(
+                lambda cert: cert.state == "active"
+            )
 
             wizard.active_beneficiary_count = len(
                 member.club_beneficiary_ids.filtered(

@@ -108,6 +108,20 @@
             <form string="Ficha del Club">
                 <header>
                     <button
+                        name="action_open_club_member_absence_wizard"
+                        type="object"
+                        string="Registrar ausencia"
+                        groups="club_membership.group_club_member_absence,base.group_system"
+                        invisible="club_person_type != 'member' or club_member_state != 'active'"
+                    />
+                    <button
+                        name="action_open_club_member_absence_return_wizard"
+                        type="object"
+                        string="Registrar retorno"
+                        groups="club_membership.group_club_member_absence,base.group_system"
+                        invisible="club_person_type != 'member' or club_member_state != 'absent'"
+                    />
+                    <button
                         name="action_open_club_member_withdrawal_wizard"
                         type="object"
                         string="Retirar / dar de baja"
@@ -333,6 +347,7 @@
 
                         <group>
                             <field name="club_member_state" readonly="1"/>
+                            <field name="club_entry_suspended_by_absence" string="Ingreso suspendido por ausencia" readonly="1"/>
                             <field name="club_legal_state"/>
                         </group>
                     </group>
@@ -392,6 +407,7 @@
                                     />
 
                                     <field name="state"/>
+                                    <field name="club_entry_suspended_by_absence" string="Suspendido por ausencia" readonly="1" optional="show"/>
 
                                     <field
                                         name="block_reason"
